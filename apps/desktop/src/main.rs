@@ -4,6 +4,7 @@ use gpui::{
 };
 
 mod components;
+mod notices;
 mod panels;
 mod shell;
 mod theme;
