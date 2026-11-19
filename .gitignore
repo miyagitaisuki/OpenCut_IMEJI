@@ -11,3 +11,6 @@ docs/
 
 # pinned FFmpeg builds (moon run media:setup)
 .cache/
+
+# lesson material made locally (audio, scripts, renders): not part of the repo
+lessons/
