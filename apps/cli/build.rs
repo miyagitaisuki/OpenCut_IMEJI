@@ -24,12 +24,20 @@ fn main() {
 /// OUT_DIR is target/<profile>/build/<crate>-<hash>/out: three folders up
 /// is where Cargo puts the binaries.
 fn copy_dlls(from: &std::path::Path) {
-    let Some(out_dir) = std::env::var_os("OUT_DIR") else { return };
-    let Some(profile_dir) = std::path::Path::new(&out_dir).ancestors().nth(3) else { return };
-    let Ok(entries) = std::fs::read_dir(from) else { return };
+    let Some(out_dir) = std::env::var_os("OUT_DIR") else {
+        return;
+    };
+    let Some(profile_dir) = std::path::Path::new(&out_dir).ancestors().nth(3) else {
+        return;
+    };
+    let Ok(entries) = std::fs::read_dir(from) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("dll"))
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("dll"))
             && let Some(name) = path.file_name()
         {
             let _ = std::fs::copy(&path, profile_dir.join(name));

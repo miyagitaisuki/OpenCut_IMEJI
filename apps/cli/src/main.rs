@@ -65,6 +65,12 @@ enum Command {
         /// Loudness to bring the mix to, in LUFS (default -16).
         #[arg(long, allow_hyphen_values = true)]
         loudness: Option<f64>,
+        /// Video to open the lesson with (e.g. a Remotion intro from apps/intro).
+        #[arg(long)]
+        intro: Option<PathBuf>,
+        /// Video to close the lesson with.
+        #[arg(long)]
+        outro: Option<PathBuf>,
         /// Slide image; repeat in order (one per scene, one per line, or spread evenly).
         #[arg(long = "slide")]
         slides: Vec<PathBuf>,
@@ -137,6 +143,8 @@ fn main() -> Result<()> {
             timeline,
             script,
             loudness,
+            intro,
+            outro,
             slides,
             title,
             width,
@@ -151,6 +159,8 @@ fn main() -> Result<()> {
                 timeline,
                 script,
                 loudness_lufs: loudness,
+                intro,
+                outro,
                 slides,
                 title,
                 width,

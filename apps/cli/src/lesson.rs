@@ -30,6 +30,12 @@ pub(crate) struct ImportRequest {
     /// Loudness to bring the mix to, in LUFS (default -16).
     #[serde(default)]
     pub loudness_lufs: Option<f64>,
+    /// A video to open the lesson with (e.g. the Remotion intro); the lesson moves after it.
+    #[serde(default)]
+    pub intro: Option<PathBuf>,
+    /// A video to close the lesson with.
+    #[serde(default)]
+    pub outro: Option<PathBuf>,
     /// Slide images in order: one per scene, one per line, or spread evenly.
     #[serde(default)]
     pub slides: Vec<PathBuf>,
@@ -83,6 +89,14 @@ pub(crate) fn import(request: &ImportRequest) -> Result<ImportResult> {
         &project_dir,
     )?;
     let mut project = project;
+    if let Some(intro) = &request.intro {
+        let (path, seconds, audio) = clip(intro, &project_dir)?;
+        project.prepend_clip(path, seconds, audio, "intro");
+    }
+    if let Some(outro) = &request.outro {
+        let (path, seconds, audio) = clip(outro, &project_dir)?;
+        project.append_clip(path, seconds, audio, "outro");
+    }
     if let Some(lufs) = request.loudness_lufs {
         project.loudness_lufs = Some(lufs);
     }
@@ -168,6 +182,21 @@ fn default_output(project: &Path) -> PathBuf {
         .unwrap_or_default();
     let name = stem.strip_suffix(".project").unwrap_or(&stem);
     project.with_file_name(format!("{name}.mp4"))
+}
+
+/// A clip's path as the project should hold it, its length, and whether it has sound.
+fn clip(path: &Path, project_dir: &Path) -> Result<(PathBuf, f64, bool)> {
+    let info = opencut_media::probe(path).with_context(|| format!("reading {}", path.display()))?;
+    if info.video.is_empty() || info.duration_seconds <= 0.0 {
+        bail!("{} has no video to put in the lesson", path.display());
+    }
+    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_owned());
+    let base = std::path::absolute(project_dir).unwrap_or_else(|_| project_dir.to_owned());
+    let stored = absolute
+        .strip_prefix(&base)
+        .map(Path::to_owned)
+        .unwrap_or(absolute);
+    Ok((stored, info.duration_seconds, !info.audio.is_empty()))
 }
 
 fn parent(path: &Path) -> PathBuf {

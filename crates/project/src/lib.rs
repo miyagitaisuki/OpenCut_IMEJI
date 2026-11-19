@@ -223,6 +223,47 @@ impl Project {
         })
     }
 
+    /// Moves everything on the timeline `seconds` later.
+    pub fn shift(&mut self, seconds: f64) {
+        for v in &mut self.visuals {
+            v.start += seconds;
+            v.end += seconds;
+        }
+        for a in &mut self.audio {
+            a.start += seconds;
+        }
+        for c in &mut self.subtitles {
+            c.start += seconds;
+            c.end += seconds;
+        }
+        for m in &mut self.markers {
+            m.time += seconds;
+        }
+    }
+
+    /// Puts a clip (an intro video) before everything, which moves later.
+    /// `with_audio`: the file has sound to mix in too.
+    pub fn prepend_clip(&mut self, path: PathBuf, duration: f64, with_audio: bool, label: &str) {
+        self.shift(duration);
+        self.visuals
+            .insert(0, clip_visual(path.clone(), 0.0, duration));
+        if with_audio {
+            self.audio.insert(0, clip_audio(path, 0.0, duration));
+        }
+        self.markers.insert(0, chapter(0.0, label));
+    }
+
+    /// Puts a clip (an outro video) after everything.
+    pub fn append_clip(&mut self, path: PathBuf, duration: f64, with_audio: bool, label: &str) {
+        let at = self.duration();
+        self.visuals
+            .push(clip_visual(path.clone(), at, at + duration));
+        if with_audio {
+            self.audio.push(clip_audio(path, at, duration));
+        }
+        self.markers.push(chapter(at, label));
+    }
+
     /// Where the timeline ends: the last visual, subtitle or marker, or an
     /// audio clip with a known duration.
     pub fn duration(&self) -> f64 {
@@ -324,6 +365,37 @@ impl Project {
     }
 }
 
+fn clip_visual(path: PathBuf, start: f64, end: f64) -> Visual {
+    Visual {
+        kind: VisualKind::Video,
+        path: Some(path),
+        color: None,
+        start,
+        end,
+        source_start: 0.0,
+        fit: Fit::Contain,
+    }
+}
+
+fn clip_audio(path: PathBuf, start: f64, duration: f64) -> AudioClip {
+    AudioClip {
+        path,
+        start,
+        source_start: 0.0,
+        duration: Some(duration),
+        gain_db: 0.0,
+    }
+}
+
+fn chapter(time: f64, label: &str) -> Marker {
+    Marker {
+        time,
+        kind: "chapter".into(),
+        label: label.into(),
+        reference: None,
+    }
+}
+
 /// `path` as given if absolute, else under `base`.
 pub fn resolve(base: &Path, path: &Path) -> PathBuf {
     if path.is_absolute() {
@@ -382,6 +454,39 @@ mod tests {
         };
         let problems = project.problems(Path::new("/nonexistent"));
         assert_eq!(problems.len(), 3, "{problems:#?}");
+    }
+
+    #[test]
+    fn intro_and_outro_move_the_lesson() {
+        let mut project: Project = serde_json::from_str(
+            r#"{"visuals":[{"path":"s.png","start":0,"end":10}],"audio":[{"path":"v.mp3","duration":10}],
+                "subtitles":[{"start":1,"end":2,"text":"a"}],"markers":[{"time":5,"kind":"scene"}]}"#,
+        )
+        .unwrap();
+        project.prepend_clip("intro.mp4".into(), 4.0, true, "intro");
+        project.append_clip("outro.mp4".into(), 3.0, false, "outro");
+        assert_eq!(project.duration(), 17.0);
+        assert_eq!(
+            (project.visuals[0].start, project.visuals[0].end),
+            (0.0, 4.0)
+        );
+        assert_eq!(
+            (project.visuals[1].start, project.visuals[1].end),
+            (4.0, 14.0)
+        );
+        assert_eq!(
+            (project.visuals[2].start, project.visuals[2].end),
+            (14.0, 17.0)
+        );
+        assert_eq!((project.audio[0].start, project.audio[1].start), (0.0, 4.0));
+        assert_eq!(project.audio.len(), 2, "the outro had no sound");
+        assert_eq!(project.subtitles[0].start, 5.0);
+        let marks: Vec<_> = project
+            .markers
+            .iter()
+            .map(|m| (m.time, m.kind.as_str()))
+            .collect();
+        assert_eq!(marks, [(0.0, "chapter"), (9.0, "scene"), (14.0, "chapter")]);
     }
 
     #[test]

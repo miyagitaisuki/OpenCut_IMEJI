@@ -1,0 +1,6 @@
+node_modules/
+out/
+# made by `bun run speak` from each scene
+public/voices/
+scenes/*.props.json
+!scenes/sample.props.json
