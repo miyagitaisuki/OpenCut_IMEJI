@@ -3816,6 +3816,8 @@ dependencies = [
  "base64 0.22.1",
  "clap",
  "opencut-media",
+ "opencut-project",
+ "opencut-render",
  "rmcp",
  "serde",
  "serde_json",
@@ -3839,6 +3841,27 @@ dependencies = [
  "ffmpeg-next",
  "png 0.18.1",
  "serde",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "opencut-project"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "opencut-render"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "opencut-media",
+ "opencut-project",
+ "serde",
+ "serde_json",
  "thiserror 2.0.19",
 ]
 

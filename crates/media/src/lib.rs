@@ -14,12 +14,16 @@
 //! # Ok::<(), opencut_media::Error>(())
 //! ```
 
+mod audio;
 mod decode;
+mod encode;
 mod error;
 mod frame;
 mod probe;
 
+pub use audio::{AudioBuffer, decode_audio};
 pub use decode::{VideoDecoder, thumbnails};
+pub use encode::{AudioSettings, VideoCodec, VideoSettings, VideoWriter};
 pub use error::{Error, Result};
 pub use frame::{Frame, PixelFormat};
 pub use probe::{AudioStream, MediaInfo, OtherStream, VideoStream, probe};

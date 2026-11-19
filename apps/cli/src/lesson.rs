@@ -1,0 +1,166 @@
+//! Lesson projects: what `import-textts`, `check` and `render` do, shared
+//! by the command line and the MCP server.
+
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result, bail};
+use opencut_media::VideoCodec;
+use opencut_project::{Canvas, Project, TexttsImport, import_textts};
+use opencut_render::{RenderOptions, RenderReport, render};
+use rmcp::schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct ImportRequest {
+    /// The audio textts made (`<name>.mp3` or `.wav`).
+    pub audio: PathBuf,
+    /// Where to save the project; also the folder its paths are relative to.
+    pub project: PathBuf,
+    /// Subtitles; defaults to `<name>.srt` beside the audio.
+    #[serde(default)]
+    pub srt: Option<PathBuf>,
+    /// textts timeline; defaults to `<name>.timeline.json` beside the audio.
+    #[serde(default)]
+    pub timeline: Option<PathBuf>,
+    /// Slide images in order: one per scene, one per line, or spread evenly.
+    #[serde(default)]
+    pub slides: Vec<PathBuf>,
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Canvas width (default 1920).
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// Canvas height (default 1080).
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// Frames per second (default 30).
+    #[serde(default)]
+    pub fps: Option<u32>,
+    /// Background `#rrggbb` (default black).
+    #[serde(default)]
+    pub background: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ImportResult {
+    pub project: PathBuf,
+    pub duration_seconds: f64,
+    pub slides: usize,
+    pub subtitles: usize,
+    pub markers: usize,
+    pub problems: Vec<String>,
+}
+
+pub(crate) fn import(request: &ImportRequest) -> Result<ImportResult> {
+    let project_dir = parent(&request.project);
+    std::fs::create_dir_all(&project_dir)
+        .with_context(|| format!("creating {}", project_dir.display()))?;
+    let defaults = Canvas::default();
+    let canvas = Canvas {
+        width: request.width.unwrap_or(defaults.width),
+        height: request.height.unwrap_or(defaults.height),
+        fps: request.fps.unwrap_or(defaults.fps),
+        background: request.background.clone().unwrap_or(defaults.background),
+    };
+    let project = import_textts(
+        &TexttsImport {
+            audio: request.audio.clone(),
+            srt: request.srt.clone(),
+            timeline: request.timeline.clone(),
+            slides: request.slides.clone(),
+            title: request.title.clone(),
+            canvas: Some(canvas),
+        },
+        &project_dir,
+    )?;
+    project.save(&request.project)?;
+    Ok(ImportResult {
+        project: request.project.clone(),
+        duration_seconds: project.duration(),
+        slides: project.visuals.iter().filter(|v| v.path.is_some()).count(),
+        subtitles: project.subtitles.len(),
+        markers: project.markers.len(),
+        problems: project.problems(&project_dir),
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CheckResult {
+    pub ok: bool,
+    pub title: String,
+    pub duration_seconds: f64,
+    pub visuals: usize,
+    pub audio: usize,
+    pub subtitles: usize,
+    pub markers: usize,
+    pub problems: Vec<String>,
+}
+
+pub(crate) fn check(path: &Path) -> Result<CheckResult> {
+    let project = Project::load(path)?;
+    let problems = project.problems(&parent(path));
+    Ok(CheckResult {
+        ok: problems.is_empty(),
+        title: project.title.clone(),
+        duration_seconds: project.duration(),
+        visuals: project.visuals.len(),
+        audio: project.audio.len(),
+        subtitles: project.subtitles.len(),
+        markers: project.markers.len(),
+        problems,
+    })
+}
+
+pub(crate) fn parse_codec(name: Option<&str>) -> Result<VideoCodec> {
+    Ok(match name.unwrap_or("auto") {
+        "auto" => VideoCodec::Auto,
+        "h264" => VideoCodec::H264,
+        "mpeg4" => VideoCodec::Mpeg4,
+        other => bail!("unknown codec {other:?}: expected auto, h264 or mpeg4"),
+    })
+}
+
+/// Renders `project` to `output`, by default `<project name>.mp4` beside it.
+pub(crate) fn render_project(
+    project: &Path,
+    output: Option<&Path>,
+    codec: VideoCodec,
+    progress: impl FnMut(f64),
+) -> Result<RenderReport> {
+    let loaded = Project::load(project)?;
+    let output = output
+        .map(Path::to_owned)
+        .unwrap_or_else(|| default_output(project));
+    if let Some(dir) = output.parent().filter(|dir| !dir.as_os_str().is_empty()) {
+        std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    }
+    let options = RenderOptions {
+        codec,
+        ..RenderOptions::default()
+    };
+    Ok(render(
+        &loaded,
+        &parent(project),
+        &output,
+        &options,
+        progress,
+    )?)
+}
+
+/// `bai10.project.json` → `bai10.mp4`; `lesson.json` → `lesson.mp4`.
+fn default_output(project: &Path) -> PathBuf {
+    let stem = project
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let name = stem.strip_suffix(".project").unwrap_or(&stem);
+    project.with_file_name(format!("{name}.mp4"))
+}
+
+fn parent(path: &Path) -> PathBuf {
+    match path.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.to_owned(),
+        _ => PathBuf::from("."),
+    }
+}

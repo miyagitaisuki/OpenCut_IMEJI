@@ -1,0 +1,15 @@
+[package]
+name = "opencut-render"
+description = "Renders an OpenCut project.json to a video file, with subtitle and marker sidecars"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Slides: the LGPL FFmpeg build has no zlib, so no PNG decoder.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+opencut-media = { workspace = true }
+opencut-project = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"

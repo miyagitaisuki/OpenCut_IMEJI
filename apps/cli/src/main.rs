@@ -4,6 +4,7 @@
 //! (`probe`, `frame`, `thumbnails`) and for AI agents (`mcp`, a Model
 //! Context Protocol server on stdio).
 
+mod lesson;
 mod mcp;
 
 use std::path::{Path, PathBuf};
@@ -45,6 +46,46 @@ enum Command {
         #[arg(long, default_value_t = 320)]
         max_size: u32,
     },
+    /// Build a lesson project from the audio, .srt and .timeline.json textts made.
+    ImportTextts {
+        /// The audio textts made (`<name>.mp3`).
+        audio: PathBuf,
+        /// Where to save the project.
+        #[arg(long, short)]
+        output: PathBuf,
+        /// Defaults to `<name>.srt` beside the audio.
+        #[arg(long)]
+        srt: Option<PathBuf>,
+        /// Defaults to `<name>.timeline.json` beside the audio.
+        #[arg(long)]
+        timeline: Option<PathBuf>,
+        /// Slide image; repeat in order (one per scene, one per line, or spread evenly).
+        #[arg(long = "slide")]
+        slides: Vec<PathBuf>,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        width: Option<u32>,
+        #[arg(long)]
+        height: Option<u32>,
+        #[arg(long)]
+        fps: Option<u32>,
+        /// `#rrggbb`.
+        #[arg(long)]
+        background: Option<String>,
+    },
+    /// List what would stop a project from rendering.
+    Check { project: PathBuf },
+    /// Render a project to a video, with .vtt/.srt subtitles and .markers.json beside it.
+    Render {
+        project: PathBuf,
+        /// Defaults to `<project>.mp4`.
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+        /// auto (H.264 when available), h264 or mpeg4.
+        #[arg(long, default_value = "auto")]
+        codec: String,
+    },
     /// Serve the editor's tools to AI agents over MCP (stdio).
     Mcp,
 }
@@ -82,6 +123,54 @@ fn main() -> Result<()> {
             for path in save_thumbnails(&file, count, max_size, &out_dir)? {
                 println!("{}", path.display());
             }
+        }
+        Command::ImportTextts {
+            audio,
+            output,
+            srt,
+            timeline,
+            slides,
+            title,
+            width,
+            height,
+            fps,
+            background,
+        } => {
+            let result = lesson::import(&lesson::ImportRequest {
+                audio,
+                project: output,
+                srt,
+                timeline,
+                slides,
+                title,
+                width,
+                height,
+                fps,
+                background,
+            })?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::Check { project } => {
+            let result = lesson::check(&project)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+            if !result.ok {
+                std::process::exit(1);
+            }
+        }
+        Command::Render {
+            project,
+            output,
+            codec,
+        } => {
+            let codec = lesson::parse_codec(Some(&codec))?;
+            let report = lesson::render_project(&project, output.as_deref(), codec, |done| {
+                eprint!("\rrendering {:>3.0}%", done * 100.0);
+            })?;
+            eprintln!();
+            for warning in &report.warnings {
+                eprintln!("warning: {warning}");
+            }
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Command::Mcp => {
             tokio::runtime::Runtime::new()?.block_on(mcp::serve())?;

@@ -11,6 +11,10 @@ pub enum Error {
     },
     #[error("{0} has no video stream")]
     NoVideo(PathBuf),
+    #[error("{0} has no audio stream")]
+    NoAudio(PathBuf),
+    #[error("no {0} encoder in this FFmpeg build")]
+    NoEncoder(&'static str),
     #[error("no frame at {seconds:.3}s (the video ends at {duration:.3}s)")]
     OutOfRange { seconds: f64, duration: f64 },
     #[error("ffmpeg: {0}")]

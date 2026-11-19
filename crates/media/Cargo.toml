@@ -11,7 +11,7 @@ links = "opencut_ffmpeg"
 build = "build.rs"
 
 [dependencies]
-ffmpeg-next = { version = "9.1", default-features = false, features = ["codec", "format", "software-scaling"] }
+ffmpeg-next = { version = "9.1", default-features = false, features = ["codec", "format", "software-resampling", "software-scaling"] }
 png = "0.18"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"

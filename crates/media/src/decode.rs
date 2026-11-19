@@ -29,6 +29,8 @@ pub struct VideoDecoder {
     frame_rate: Option<f64>,
     format: PixelFormat,
     max_size: Option<u32>,
+    /// Exact output size, overriding `max_size` (up or down).
+    forced_size: Option<(u32, u32)>,
     scaler: Option<Scaler>,
     eof_sent: bool,
 }
@@ -97,6 +99,7 @@ impl VideoDecoder {
             frame_rate,
             format,
             max_size,
+            forced_size: None,
             scaler: None,
             eof_sent: false,
         })
@@ -114,9 +117,22 @@ impl VideoDecoder {
         self.frame_rate
     }
 
-    /// Size frames come out at, after `max_size` is applied.
+    /// The stream's own frame size.
+    pub fn source_size(&self) -> (u32, u32) {
+        (self.decoder.width(), self.decoder.height())
+    }
+
+    /// Size frames come out at, after `max_size` or `set_output_size`.
     pub fn output_size(&self) -> (u32, u32) {
-        fit(self.decoder.width(), self.decoder.height(), self.max_size)
+        self.forced_size
+            .unwrap_or_else(|| fit(self.decoder.width(), self.decoder.height(), self.max_size))
+    }
+
+    /// Scales every frame to exactly `width`×`height` from now on, up or
+    /// down, without keeping the aspect ratio (the caller picks a size that does).
+    pub fn set_output_size(&mut self, width: u32, height: u32) {
+        self.forced_size = Some((width.max(1), height.max(1)));
+        self.scaler = None;
     }
 
     /// The next frame in presentation order, or `None` at the end.
@@ -194,7 +210,9 @@ impl VideoDecoder {
             .as_ref()
             .is_none_or(|scaler| scaler.source != source)
         {
-            let (width, height) = fit(source.1, source.2, self.max_size);
+            let (width, height) = self
+                .forced_size
+                .unwrap_or_else(|| fit(source.1, source.2, self.max_size));
             let context = scaling::Context::get(
                 source.0,
                 source.1,

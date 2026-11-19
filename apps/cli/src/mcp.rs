@@ -1,4 +1,5 @@
-//! MCP server: lets an AI agent inspect and look at media.
+//! MCP server: lets an AI agent inspect and look at media, and build and
+//! render lesson videos from what textts makes.
 //!
 //! Decoding is blocking work, so every tool runs it on Tokio's blocking
 //! pool and the server keeps answering while a long seek runs.
@@ -55,6 +56,24 @@ struct ThumbnailsParams {
     output_dir: Option<PathBuf>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+struct ProjectParams {
+    /// Path of the project.json.
+    project: PathBuf,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+struct RenderParams {
+    /// Path of the project.json.
+    project: PathBuf,
+    /// Video to write; defaults to the project's name with .mp4.
+    output: Option<PathBuf>,
+    /// auto (H.264 when this FFmpeg has it, else MPEG-4), h264 or mpeg4.
+    codec: Option<String>,
+}
+
 #[derive(Clone)]
 pub(crate) struct OpenCut {
     tool_router: ToolRouter<Self>,
@@ -106,6 +125,65 @@ impl OpenCut {
     ) -> Result<CallToolResult, ErrorData> {
         respond(Self::thumbnails(params).await)
     }
+
+    #[tool(
+        description = "Build a lesson project (project.json) from what textts made for a dialogue: its audio, .srt subtitles (speaker roles from .timeline.json) and scene markers, with slide images spread over scenes or lines. Returns the project's duration and any problems that would stop rendering."
+    )]
+    async fn import_textts(
+        &self,
+        Parameters(request): Parameters<crate::lesson::ImportRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || crate::lesson::import(&request).map_err(chain)).await,
+        ))
+    }
+
+    #[tool(
+        description = "Check a project.json: its duration, counts, and every problem (missing files, bad times, bad canvas) that would stop it rendering.",
+        annotations(read_only_hint = true)
+    )]
+    async fn check_project(
+        &self,
+        Parameters(params): Parameters<ProjectParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || crate::lesson::check(&params.project).map_err(chain)).await,
+        ))
+    }
+
+    #[tool(
+        description = "Render a project.json to a video (MP4 by default), and write .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
+    )]
+    async fn render_project(
+        &self,
+        Parameters(params): Parameters<RenderParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                let codec = crate::lesson::parse_codec(params.codec.as_deref()).map_err(chain)?;
+                crate::lesson::render_project(
+                    &params.project,
+                    params.output.as_deref(),
+                    codec,
+                    |_| {},
+                )
+                .map_err(chain)
+            })
+            .await,
+        ))
+    }
+}
+
+/// A result as structured JSON content.
+fn json<T: serde::Serialize>(result: Result<T, Failure>) -> Result<CallToolResult, Failure> {
+    Ok(CallToolResult::structured(
+        serde_json::to_value(result?).map_err(failure)?,
+    ))
+}
+
+/// An error with its causes, `outer: inner: …`.
+fn chain(error: anyhow::Error) -> Failure {
+    Failure(format!("{error:#}"))
 }
 
 impl OpenCut {
@@ -174,7 +252,7 @@ impl OpenCut {
 #[tool_handler(
     router = self.tool_router,
     name = "opencut",
-    instructions = "OpenCut's media tools. Paths are on the machine running the server. Times are in seconds from the start of the file. Call probe_media first to learn a file's duration."
+    instructions = "OpenCut: media tools and lesson video rendering. Paths are on the machine running the server; times are in seconds. To make a lesson video from textts output: import_textts, then check_project, then render_project. probe_media, extract_frame and generate_thumbnails inspect any video, including a rendered one."
 )]
 impl ServerHandler for OpenCut {}
 
