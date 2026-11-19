@@ -21,7 +21,8 @@ jobs:
       # One platform failing must not cancel the others' results.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # No macos-latest: this account gets no macOS runners (see media-deps.yml).
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout repository
