@@ -18,8 +18,11 @@ jobs:
   ci:
     runs-on: ${{ matrix.os }}
     strategy:
+      # One platform failing must not cancel the others' results.
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # No macos-latest: this account gets no macOS runners (see media-deps.yml).
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout repository
@@ -32,6 +35,11 @@ jobs:
         with:
           auto-install: true
           auto-setup: true
+
+      # GPUI (the desktop app) links against these on Linux; see apps/desktop/README.md.
+      - name: Install desktop build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libfontconfig-dev
 
       - name: Run CI
         run: moon ci

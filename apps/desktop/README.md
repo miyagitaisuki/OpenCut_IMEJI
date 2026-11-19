@@ -3,7 +3,9 @@
 Built with [GPUI](https://www.gpui.rs).
 
 > [!WARNING]
-> Very early. Right now this is just a window that opens.
+> Very early. The preview panel plays a video (open it with **Open…**, by
+> dropping it on the panel, or with `cargo run -- clip.mp4`); the other
+> panels are placeholders.
 
 ## Running
 
@@ -15,7 +17,7 @@ moon run desktop:check   # cargo check
 moon run desktop:build   # cargo build --release
 ```
 
-The first build compiles GPUI from source and takes a while. The root `Cargo.lock` is committed.
+The first build compiles GPUI from source and takes a while. `moon run media:setup` (run by these tasks) puts the pinned FFmpeg in `.cache/media/`. The root `Cargo.lock` is committed.
 
 ## Platform requirements
 

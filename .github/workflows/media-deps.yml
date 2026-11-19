@@ -36,9 +36,11 @@ jobs:
           # Windows cross-compiles from Linux with llvm-mingw.
           - { platform: windows-x86_64, runner: ubuntu-22.04 }
           - { platform: windows-aarch64, runner: ubuntu-22.04 }
-          # Both Mac architectures build on Apple silicon.
-          - { platform: macos-aarch64, runner: macos-15 }
-          - { platform: macos-x86_64, runner: macos-15 }
+          # macOS (macos-15 runners) is left out: this repository's account
+          # gets no macOS runners, and OpenCut IMEJI targets Windows. Put the
+          # two lines back to build for Macs:
+          #   - { platform: macos-aarch64, runner: macos-15 }
+          #   - { platform: macos-x86_64, runner: macos-15 }
 
     steps:
       - uses: actions/checkout@v4

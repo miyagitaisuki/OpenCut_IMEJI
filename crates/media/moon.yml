@@ -1,0 +1,30 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'rust'
+layer: 'library'
+
+tasks:
+  setup:
+    command: 'bun run setup/setup.ts'
+    # Every Rust check needs the FFmpeg headers; the script itself skips a
+    # build that is already in place.
+    options:
+      cache: false
+
+  check:
+    command: 'cargo check -p opencut-media'
+    deps: ['setup']
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.toml'
+      - '/Cargo.lock'
+
+  test:
+    command: 'cargo test -p opencut-media'
+    deps: ['setup']
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.toml'
+      - '/Cargo.lock'
