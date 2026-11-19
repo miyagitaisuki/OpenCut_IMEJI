@@ -25,7 +25,7 @@ impl Shell {
         Self {
             browser: cx.new(|_| Browser),
             preview,
-            inspector: cx.new(|_| Inspector),
+            inspector: cx.new(|_| Inspector::new()),
             timeline: cx.new(|_| Timeline),
         }
     }

@@ -10,6 +10,7 @@ mod mcp;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use clap::ValueEnum;
 use clap::{Parser, Subcommand};
 use opencut_media::{PixelFormat, VideoDecoder, probe, thumbnails};
 
@@ -18,6 +19,12 @@ use opencut_media::{PixelFormat, VideoDecoder, probe, thumbnails};
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, ValueEnum)]
+enum Switch {
+    On,
+    Off,
 }
 
 #[derive(Subcommand)]
@@ -105,6 +112,12 @@ enum Command {
         /// to the system's Japanese fonts (Yu Gothic, Meiryo, Noto Sans CJK).
         #[arg(long = "font")]
         fonts: Vec<PathBuf>,
+    },
+    /// Turn H.264 encoding (Cisco's OpenH264) on or off, or show the setting.
+    /// Off: `render` falls back to MPEG-4 and `--codec h264` is refused.
+    H264 {
+        /// on or off; omit to show the current setting.
+        state: Option<Switch>,
     },
     /// Serve the editor's tools to AI agents over MCP (stdio).
     Mcp,
@@ -205,6 +218,13 @@ fn main() -> Result<()> {
                 eprintln!("warning: {warning}");
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::H264 { state } => {
+            if let Some(state) = state {
+                opencut_media::set_h264_enabled(state == Switch::On)?;
+            }
+            let on = opencut_media::h264_enabled();
+            println!("H.264 is {}", if on { "on" } else { "off" });
         }
         Command::Mcp => {
             tokio::runtime::Runtime::new()?.block_on(mcp::serve())?;

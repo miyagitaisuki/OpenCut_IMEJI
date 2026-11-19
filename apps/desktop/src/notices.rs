@@ -10,5 +10,4 @@ source, or other H.264 encoders, are not covered by Cisco's payment. \
 OpenH264 source is BSD-2-Clause; the binary is under Cisco's OpenH264 binary licence \
 (https://www.openh264.org/BINARY_LICENSE.txt).";
 
-pub(crate) const FFMPEG_NOTICE: &str =
-    "FFmpeg is used as shared libraries under the LGPL 2.1 or later. See COPYING.LGPLv2.1 and BUILD.md beside the libraries.";
+pub(crate) const FFMPEG_NOTICE: &str = "FFmpeg is used as shared libraries under the LGPL 2.1 or later. See COPYING.LGPLv2.1 and BUILD.md beside the libraries.";
