@@ -18,6 +18,8 @@ jobs:
   ci:
     runs-on: ${{ matrix.os }}
     strategy:
+      # One platform failing must not cancel the others' results.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
