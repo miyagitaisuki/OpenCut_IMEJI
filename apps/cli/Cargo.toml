@@ -1,0 +1,22 @@
+[package]
+name = "opencut-cli"
+description = "OpenCut headless: probe, frames and thumbnails from the command line, and an MCP server for AI agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "opencut"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+opencut-media = { workspace = true }
+opencut-project = { workspace = true }
+opencut-render = { workspace = true }
+rmcp = { version = "3.11", features = ["server", "transport-io", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }

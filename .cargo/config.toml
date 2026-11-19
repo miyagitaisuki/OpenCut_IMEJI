@@ -1,0 +1,4 @@
+# ffmpeg-sys-next links against the pinned FFmpeg that
+# `moon run media:setup` puts in .cache/media/ (`current` is the host's build).
+[env]
+FFMPEG_DIR = { value = ".cache/media/current", relative = true }

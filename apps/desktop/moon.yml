@@ -3,14 +3,18 @@ $schema: 'https://moonrepo.dev/schemas/project.json'
 language: 'rust'
 layer: 'application'
 
+dependsOn: ['media']
+
 tasks:
   dev:
     command: 'cargo run'
+    deps: ['media:setup']
     options:
       runInCI: false
 
   check:
     command: 'cargo check'
+    deps: ['media:setup']
     inputs:
       - 'src/**/*'
       - 'Cargo.toml'
@@ -19,10 +23,12 @@ tasks:
 
   build:
     command: 'cargo build --release'
+    deps: ['media:setup']
     inputs:
       - 'src/**/*'
       - 'Cargo.toml'
       - '/Cargo.toml'
       - '/Cargo.lock'
     outputs:
-      - '/target/release/opencut-desktop'
+      # opencut-desktop on Linux and macOS, opencut-desktop.exe on Windows (a glob, so either counts).
+      - '/target/release/opencut-desktop*'

@@ -31,7 +31,10 @@ fn main() {
         }
     }
 
-    Application::new().run(|cx: &mut App| {
+    // `opencut-desktop clip.mp4` opens the clip in the preview.
+    let open = std::env::args_os().nth(1).map(std::path::PathBuf::from);
+
+    Application::new().run(move |cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(960.), px(600.)), cx);
         cx.open_window(
             WindowOptions {
@@ -49,7 +52,7 @@ fn main() {
                     })
                     .detach();
 
-                    Shell::new(cx)
+                    Shell::new(open, cx)
                 })
             },
         )

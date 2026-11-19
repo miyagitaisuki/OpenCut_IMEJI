@@ -59,7 +59,10 @@ proto use    # installs the tools pinned in .prototools
 moon run web:dev       # localhost:5173
 moon run api:dev       # localhost:8787
 moon run desktop:dev   # see apps/desktop/README.md
+moon run cli:mcp       # MCP server for AI agents, see apps/cli/README.md
 ```
+
+The Rust apps decode with the pinned FFmpeg in `crates/media`; their tasks run `moon run media:setup` first, which downloads it (or builds it from source) into `.cache/media/`.
 
 ## Contributing
 

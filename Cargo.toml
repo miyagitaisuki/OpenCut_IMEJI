@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
+  'apps/cli',
   'apps/desktop',
-  # 'crates/*',
+  'crates/*',
 ]
 
 [workspace.package]
@@ -12,3 +13,6 @@ license = "MIT"
 
 [workspace.dependencies]
 gpui = "0.2.2"
+opencut-media = { path = "crates/media" }
+opencut-project = { path = "crates/project" }
+opencut-render = { path = "crates/render" }
