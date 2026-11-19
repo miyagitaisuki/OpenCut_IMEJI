@@ -225,8 +225,15 @@ impl VideoWriter {
 fn find_video_codec(choice: VideoCodec) -> Result<ffmpeg_next::Codec> {
     let h264 = || encoder::find_by_name("libopenh264").or_else(|| encoder::find(codec::Id::H264));
     let mpeg4 = || encoder::find(codec::Id::MPEG4);
+    // Cisco's OpenH264 is the H.264 encoder: with the user's switch off,
+    // Auto falls back to MPEG-4 and asking for H.264 outright is an error.
+    let h264_allowed = crate::h264_enabled();
+    if choice == VideoCodec::H264 && !h264_allowed {
+        return Err(Error::H264Disabled);
+    }
     match choice {
-        VideoCodec::Auto => h264().or_else(mpeg4),
+        VideoCodec::Auto if h264_allowed => h264().or_else(mpeg4),
+        VideoCodec::Auto => mpeg4(),
         VideoCodec::H264 => h264(),
         VideoCodec::Mpeg4 => mpeg4(),
     }

@@ -1,0 +1,34 @@
+{
+  "scene_type": "outro",
+  "avatar": "sakura",
+  "subtitle": "QBank で練習",
+  "title": "復習しよう",
+  "text": "今日の授業はこれで終わりです。QBankで問題を解いて、復習しましょう。またね。",
+  "translation": "Bài học hôm nay đến đây là hết. Hãy làm bài trên QBank để ôn lại nhé. Hẹn gặp lại!",
+  "speaker": 1431611904,
+  "gestures": [
+    {
+      "at": 0,
+      "gesture": "rest"
+    },
+    {
+      "at": 0.8,
+      "gesture": "explain"
+    },
+    {
+      "at": 3.2,
+      "gesture": "pointer"
+    },
+    {
+      "at": 5.2,
+      "gesture": "rest"
+    }
+  ],
+  "effects": [
+    {
+      "at": 3.2,
+      "type": "sparkle",
+      "duration": 1.4
+    }
+  ]
+}

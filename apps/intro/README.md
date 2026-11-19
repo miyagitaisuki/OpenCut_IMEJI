@@ -45,7 +45,9 @@ beside her.
    ```
 
    The lesson's audio, slides, subtitles and markers move after the intro;
-   `--outro` adds a closing clip the same way.
+   `--outro` adds a closing clip the same way. `scenes/outro.json` is a
+   ready outro (sakura points the lesson's learners to QBank): voice and
+   render it exactly like an intro.
 
 No engine at hand? `bun run scripts/mock-engine.ts` serves a stand-in on
 port 10101 (a tone instead of a voice, rough mora timing) to try the pipeline.

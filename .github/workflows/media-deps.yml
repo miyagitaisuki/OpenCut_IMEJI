@@ -11,7 +11,7 @@ on:
       build:
         description: "Build number for this FFmpeg version (bump it to rebuild the same version)"
         required: true
-        default: "1"
+        default: "3"
 
 permissions:
   contents: write
@@ -76,11 +76,31 @@ jobs:
       - name: Build
         run: bun run crates/media/setup/setup.ts --from-source --target ${{ matrix.platform }}
 
+      - name: Show configure's log (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          log="$(ls .cache/media/*.partial/*/ffbuild/config.log 2>/dev/null | head -1)"
+          [ -n "$log" ] && grep -n -B2 -A25 -i 'openh264' "$log" | tail -15 || echo "no config.log"
+
+      - name: Check H.264 encoding is linked in
+        if: startsWith(matrix.platform, 'linux-')
+        run: |
+          lib=.cache/media/ffmpeg-${{ steps.pins.outputs.ffmpeg }}-${{ matrix.platform }}/lib
+          readelf -d "$lib"/libavcodec.so | grep -E 'openh264|RUNPATH|RPATH' || true
+          grep -q libopenh264 <(readelf -d "$lib"/libavcodec.so)
+          # A RUNPATH (even an empty one) stops the program's RPATH from
+          # finding libopenh264.so.8 beside libavcodec.
+          ! grep -qE 'RUNPATH|RPATH' <(readelf -d "$lib"/libavcodec.so)
+
       - name: Package
         shell: bash
         run: |
           name="ffmpeg-${{ steps.pins.outputs.ffmpeg }}-${{ matrix.platform }}"
-          tar --exclude=.complete -czf "$name.tar.gz" -C .cache/media "$name"
+          # Cisco's OpenH264 binary stays out of the archive: setup.ts fetches
+          # it from Cisco, whose build is the one its patent licence covers.
+          tar --exclude=.complete --exclude='libopenh264.so.8' --exclude='openh264-*.dll' \
+            -czf "$name.tar.gz" -C .cache/media "$name"
 
       - uses: actions/upload-artifact@v4
         with:
