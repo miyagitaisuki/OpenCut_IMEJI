@@ -8,6 +8,7 @@
 //! It is deliberately plain JSON, so QBank, textts and scripts can write
 //! one without OpenCut, and `opencut render` turns it into a video.
 
+pub mod ruby;
 mod subtitles;
 mod textts;
 
@@ -56,10 +57,21 @@ pub struct Project {
     pub subtitles: Vec<Cue>,
     #[serde(default)]
     pub markers: Vec<Marker>,
+    /// Integrated loudness the mix is brought to, in LUFS (EBU R128).
+    /// -16 by default, what lessons and podcasts use; `null` leaves the
+    /// mix as it is.
+    #[serde(default = "default_loudness")]
+    pub loudness_lufs: Option<f64>,
 }
 
 fn format_version() -> u32 {
     FORMAT_VERSION
+}
+
+pub const DEFAULT_LOUDNESS_LUFS: f64 = -16.0;
+
+fn default_loudness() -> Option<f64> {
+    Some(DEFAULT_LOUDNESS_LUFS)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -173,6 +185,7 @@ impl Default for Project {
             audio: Vec::new(),
             subtitles: Vec::new(),
             markers: Vec::new(),
+            loudness_lufs: default_loudness(),
         }
     }
 }
@@ -291,6 +304,13 @@ impl Project {
             if !(cue.start >= 0.0 && cue.end > cue.start) {
                 problems.push(format!("subtitles[{i}]: needs 0 <= start < end"));
             }
+        }
+        if self
+            .loudness_lufs
+            .is_some_and(|l| !(-40.0..=-5.0).contains(&l))
+        {
+            problems
+                .push("loudness_lufs: must be -40 to -5 (or null to leave the mix alone)".into());
         }
         if self.duration() <= 0.0 {
             problems.push(

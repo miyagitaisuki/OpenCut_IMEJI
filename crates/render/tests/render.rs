@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use opencut_media::{Frame, PixelFormat, VideoDecoder, probe};
+use opencut_media::{Frame, PixelFormat, VideoDecoder, decode_audio, probe};
 use opencut_project::{AudioClip, Canvas, Cue, Fit, Marker, Project, Visual, VisualKind};
 use opencut_render::{RenderOptions, render};
 
@@ -158,6 +158,18 @@ fn renders_slides_audio_and_sidecars() {
         count += 1;
     }
     assert_eq!(count, 20);
+
+    // Brought to the project's -16 LUFS, and it measures so in the file.
+    let loudness = report.loudness.as_ref().expect("the project has audio");
+    assert!((loudness.output_lufs + 16.0).abs() < 0.2, "{loudness:?}");
+    let audio = decode_audio(&output, 48_000, 2).unwrap();
+    let mut meter = ebur128::EbuR128::new(2, 48_000, ebur128::Mode::I).unwrap();
+    meter.add_frames_f32(&audio.samples).unwrap();
+    let measured = meter.loudness_global().unwrap();
+    assert!(
+        (measured + 16.0).abs() < 1.0,
+        "rendered file measures {measured} LUFS"
+    );
 
     let vtt = std::fs::read_to_string(dir.join("lesson.vtt")).unwrap();
     assert!(

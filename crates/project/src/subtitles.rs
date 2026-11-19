@@ -1,6 +1,10 @@
 //! SubRip (`.srt`) in, SubRip and WebVTT (`.vtt`, what HTML players read) out.
+//!
+//! Cue text may carry furigana (`駅{えき}`): WebVTT shows it as ruby above
+//! the kanji, SubRip (which has no ruby) drops it.
 
 use crate::Cue;
+use crate::ruby;
 
 /// Parses SubRip. Blocks it cannot read are skipped, not fatal: an SRT
 /// written by hand often has a stray blank or number.
@@ -45,7 +49,7 @@ pub fn write_srt(cues: &[Cue]) -> String {
             i + 1,
             timestamp(cue.start, ','),
             timestamp(cue.end, ','),
-            cue.text
+            ruby::to_plain(&cue.text)
         );
     }
     out
@@ -59,10 +63,11 @@ pub fn write_vtt(cues: &[Cue]) -> String {
             .text
             .lines()
             .filter(|line| !line.trim().is_empty())
+            .map(ruby::to_vtt)
             .collect::<Vec<_>>()
             .join("\n");
         let text = match &cue.role {
-            Some(role) => format!("<v {role}>{text}"),
+            Some(role) => format!("<v {}>{text}", role.replace('>', "")),
             None => text,
         };
         out += &format!(

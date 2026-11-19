@@ -6,6 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# EBU R128 loudness, to bring every lesson to the same level.
+ebur128 = "0.1"
 # Slides: the LGPL FFmpeg build has no zlib, so no PNG decoder.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 opencut-media = { workspace = true }
@@ -13,3 +15,6 @@ opencut-project = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+
+[dev-dependencies]
+ebur128 = "0.1"

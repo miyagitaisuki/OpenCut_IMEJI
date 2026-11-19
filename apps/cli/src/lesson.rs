@@ -23,6 +23,13 @@ pub(crate) struct ImportRequest {
     /// textts timeline; defaults to `<name>.timeline.json` beside the audio.
     #[serde(default)]
     pub timeline: Option<PathBuf>,
+    /// The textts script (.txt) or textts project (.json) the audio was made
+    /// from: subtitles then keep its furigana (漢字{かな}), shown as ruby in the .vtt.
+    #[serde(default)]
+    pub script: Option<PathBuf>,
+    /// Loudness to bring the mix to, in LUFS (default -16).
+    #[serde(default)]
+    pub loudness_lufs: Option<f64>,
     /// Slide images in order: one per scene, one per line, or spread evenly.
     #[serde(default)]
     pub slides: Vec<PathBuf>,
@@ -68,12 +75,17 @@ pub(crate) fn import(request: &ImportRequest) -> Result<ImportResult> {
             audio: request.audio.clone(),
             srt: request.srt.clone(),
             timeline: request.timeline.clone(),
+            script: request.script.clone(),
             slides: request.slides.clone(),
             title: request.title.clone(),
             canvas: Some(canvas),
         },
         &project_dir,
     )?;
+    let mut project = project;
+    if let Some(lufs) = request.loudness_lufs {
+        project.loudness_lufs = Some(lufs);
+    }
     project.save(&request.project)?;
     Ok(ImportResult {
         project: request.project.clone(),

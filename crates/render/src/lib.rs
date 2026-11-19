@@ -76,8 +76,23 @@ pub struct RenderReport {
     /// The encoder used, e.g. `libopenh264` or `mpeg4`.
     pub video_codec: String,
     pub sidecars: Vec<PathBuf>,
+    /// What loudness normalization did, when the project asks for it.
+    pub loudness: Option<LoudnessReport>,
     pub warnings: Vec<String>,
 }
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LoudnessReport {
+    pub measured_lufs: f64,
+    pub target_lufs: f64,
+    pub gain_db: f64,
+    /// Below the target when the true-peak ceiling limited the gain.
+    pub output_lufs: f64,
+    pub true_peak_dbtp: f64,
+}
+
+/// Highest true peak allowed after normalization (EBU R128 / podcast specs).
+const TRUE_PEAK_CEILING_DBTP: f64 = -1.0;
 
 /// Renders `project` (its relative paths resolved against `base`) to `output`.
 /// `progress` is called with the fraction done, about once a second of video.
@@ -97,8 +112,16 @@ pub fn render(
     let duration = project.duration();
     let frames = (duration * f64::from(fps)).ceil().max(1.0) as u64;
     let mut warnings = Vec::new();
-
-    let mix = mix_audio(project, base, frames as f64 / f64::from(fps))?;
+    let mut mix = mix_audio(project, base, frames as f64 / f64::from(fps))?;
+    let loudness = match (mix.as_mut(), project.loudness_lufs) {
+        (Some(mix), Some(target)) => normalize(mix, target, &mut warnings),
+        _ => None,
+    };
+    if let Some(mix) = mix.as_mut() {
+        for sample in mix.iter_mut() {
+            *sample = sample.clamp(-1.0, 1.0);
+        }
+    }
 
     let bit_rate = options.bit_rate.unwrap_or_else(|| {
         (f64::from(width * height) * f64::from(fps) * 0.1).clamp(1e6, 2e7) as usize
@@ -187,6 +210,7 @@ pub fn render(
         fps,
         video_codec,
         sidecars,
+        loudness,
         warnings,
     })
 }
@@ -230,10 +254,50 @@ fn mix_audio(project: &Project, base: &Path, seconds: f64) -> Result<Option<Vec<
             out[1] += frame[1] * gain;
         }
     }
-    for sample in &mut mix {
-        *sample = sample.clamp(-1.0, 1.0);
-    }
+    // Not clamped yet: normalization may bring loud overlaps back in range.
     Ok(Some(mix))
+}
+
+/// Measures the mix (EBU R128, integrated) and applies one gain that brings
+/// it to `target` LUFS, or as close as the -1 dBTP ceiling allows.
+fn normalize(mix: &mut [f32], target: f64, warnings: &mut Vec<String>) -> Option<LoudnessReport> {
+    use ebur128::{EbuR128, Mode};
+    let mut meter =
+        EbuR128::new(u32::from(CHANNELS), SAMPLE_RATE, Mode::I | Mode::TRUE_PEAK).ok()?;
+    meter.add_frames_f32(mix).ok()?;
+    let measured = meter.loudness_global().ok()?;
+    if !measured.is_finite() {
+        // Silence: nothing to bring up.
+        return None;
+    }
+    let peak = (0..u32::from(CHANNELS))
+        .filter_map(|channel| meter.true_peak(channel).ok())
+        .fold(0.0f64, f64::max);
+    let peak_db = 20.0 * peak.max(1e-9).log10();
+
+    let wanted = target - measured;
+    let gain_db = wanted.min(TRUE_PEAK_CEILING_DBTP - peak_db);
+    if gain_db < wanted - 0.1 {
+        warnings.push(format!(
+            "loudness reached {:.1} LUFS, not {target:.1}: more gain would clip (peaks at {peak_db:.1} dBTP)",
+            measured + gain_db
+        ));
+    }
+    let gain = 10f64.powf(gain_db / 20.0) as f32;
+    for sample in mix.iter_mut() {
+        *sample = (*sample * gain).clamp(-1.0, 1.0);
+    }
+    Some(LoudnessReport {
+        measured_lufs: round1(measured),
+        target_lufs: target,
+        gain_db: round1(gain_db),
+        output_lufs: round1(measured + gain_db),
+        true_peak_dbtp: round1(peak_db + gain_db),
+    })
+}
+
+fn round1(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
 }
 
 /// Decoded pictures for the visuals: images once, at their size on the

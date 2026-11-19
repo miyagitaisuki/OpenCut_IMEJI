@@ -1,6 +1,11 @@
 //! Builds a project from what textts exports for a dialogue: the audio
 //! (`<name>.mp3`), its subtitles (`<name>.srt`) and its timeline
 //! (`<name>.timeline.json`: each line's role and times, and scene changes).
+//!
+//! textts' SRT has no furigana (`[1] 駅はどこですか`). Given the script
+//! (`.txt`) or textts' own project (`.json`), subtitles take each line's
+//! annotated text instead (`駅{えき}はどこですか`), matched by line id
+//! (`L001`…), which textts gives the script and the timeline alike.
 
 use std::path::{Path, PathBuf};
 
@@ -17,6 +22,9 @@ pub struct TexttsImport {
     pub audio: PathBuf,
     pub srt: Option<PathBuf>,
     pub timeline: Option<PathBuf>,
+    /// The textts script (`.txt`) or project (`.json`): subtitles then keep
+    /// its furigana.
+    pub script: Option<PathBuf>,
     /// Slides, in order. They are spread over the scenes when there is one
     /// per scene, over the lines when there is one per line, and evenly
     /// over the audio otherwise.
@@ -38,8 +46,12 @@ struct Timeline {
 #[derive(Deserialize)]
 struct Line {
     #[serde(default)]
+    id: String,
+    #[serde(default)]
     role: serde_json::Value,
     start_ms: f64,
+    #[serde(default)]
+    end_ms: f64,
 }
 
 #[derive(Deserialize)]
@@ -99,8 +111,21 @@ pub fn import_textts(import: &TexttsImport, project_dir: &Path) -> Result<Projec
             ))
         })?;
 
+    for cue in &mut cues {
+        strip_role_prefix(cue);
+    }
     if let Some(timeline) = &timeline {
         assign_roles(&mut cues, &timeline.items);
+    }
+    if let Some(script) = &import.script {
+        let lines = script_lines(script)?;
+        cues = with_furigana(cues, timeline.as_ref(), &lines).ok_or_else(|| {
+            Error::Invalid(format!(
+                "{} does not match the audio: its {} lines are not the timeline's or the subtitles'",
+                script.display(),
+                lines.len()
+            ))
+        })?;
     }
     let scenes: Vec<&Scene> = timeline
         .as_ref()
@@ -170,11 +195,7 @@ pub fn import_textts(import: &TexttsImport, project_dir: &Path) -> Result<Projec
 /// textts writes one SRT cue per line, in timeline order; match them by
 /// order when the counts agree, else by start time.
 fn assign_roles(cues: &mut [Cue], lines: &[Line]) {
-    let role = |line: &Line| match &line.role {
-        serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
-        serde_json::Value::Number(n) => Some(n.to_string()),
-        _ => None,
-    };
+    let role = role_of;
     if cues.len() == lines.len() {
         for (cue, line) in cues.iter_mut().zip(lines) {
             cue.role = role(line);
@@ -186,6 +207,178 @@ fn assign_roles(cues: &mut [Cue], lines: &[Line]) {
             .iter()
             .filter(|line| (line.start_ms / 1000.0 - cue.start).abs() < 0.1)
             .find_map(role);
+    }
+}
+
+/// textts starts each SRT cue with its speaker, `[1] `: move it to `role`.
+fn strip_role_prefix(cue: &mut Cue) {
+    let Some(rest) = cue.text.strip_prefix('[') else {
+        return;
+    };
+    let Some((role, text)) = rest.split_once(']') else {
+        return;
+    };
+    if role.is_empty() || !role.chars().all(|c| c.is_ascii_digit()) {
+        return;
+    }
+    cue.role.get_or_insert_with(|| role.to_owned());
+    cue.text = text.trim_start().to_owned();
+}
+
+/// One spoken line of a textts script: its id and annotated text.
+#[derive(Debug, PartialEq)]
+struct ScriptLine {
+    id: String,
+    display: String,
+}
+
+/// Subtitles in the script's own text. Matched by id against the timeline
+/// when there is one, else by order against the SRT. `None` if neither fits.
+fn with_furigana(
+    cues: Vec<Cue>,
+    timeline: Option<&Timeline>,
+    lines: &[ScriptLine],
+) -> Option<Vec<Cue>> {
+    if let Some(timeline) =
+        timeline.filter(|t| !t.items.is_empty() && t.items.iter().all(|i| !i.id.is_empty()))
+    {
+        let by_id: std::collections::HashMap<&str, &str> = lines
+            .iter()
+            .map(|line| (line.id.as_str(), line.display.as_str()))
+            .collect();
+        let rebuilt: Option<Vec<Cue>> = timeline
+            .items
+            .iter()
+            .map(|item| {
+                let display = by_id.get(item.id.as_str())?;
+                Some(Cue {
+                    start: item.start_ms / 1000.0,
+                    end: item.end_ms.max(item.start_ms + 1.0) / 1000.0,
+                    text: (*display).to_owned(),
+                    role: role_of(item),
+                })
+            })
+            .collect();
+        if rebuilt.is_some() {
+            return rebuilt;
+        }
+    }
+    (lines.len() == cues.len()).then(|| {
+        cues.into_iter()
+            .zip(lines)
+            .map(|(cue, line)| Cue {
+                text: line.display.clone(),
+                ..cue
+            })
+            .collect()
+    })
+}
+
+fn script_lines(path: &Path) -> Result<Vec<ScriptLine>> {
+    let text = read(path)?;
+    let is_json = path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("json"));
+    if !is_json {
+        return Ok(parse_script(&text));
+    }
+    #[derive(Deserialize)]
+    struct Project {
+        items: Vec<Item>,
+    }
+    #[derive(Deserialize)]
+    struct Item {
+        id: String,
+        #[serde(rename = "type", default)]
+        kind: String,
+        #[serde(default)]
+        display: String,
+    }
+    let project: Project = serde_json::from_str(&text).map_err(|source| Error::Json {
+        path: path.to_owned(),
+        source,
+    })?;
+    Ok(project
+        .items
+        .into_iter()
+        .filter(|item| item.kind == "line")
+        .map(|item| ScriptLine {
+            id: item.id,
+            display: item.display,
+        })
+        .collect())
+}
+
+/// textts' script syntax, as far as ids and line text go: every item
+/// (line, `[pause=…]`, `[sfx=…]`, `[bgm=…]`) takes the next id `L001`…;
+/// lines are `[1]{attrs} text` or `1: text`, indented lines continue the
+/// previous one, `#` starts a comment, ` // ` starts a translation.
+/// (Readings from textts' readings.yaml are not applied.)
+fn parse_script(text: &str) -> Vec<ScriptLine> {
+    let mut items: Vec<Option<String>> = Vec::new();
+    let mut continuing = false;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(text) = spoken_text(line) {
+            items.push(Some(text.to_owned()));
+            continuing = true;
+        } else if line.starts_with('[') {
+            // [pause=…], [sfx=…], [bgm=…]: an item without text.
+            items.push(None);
+            continuing = false;
+        } else if continuing && let Some(Some(current)) = items.last_mut() {
+            current.push_str(line);
+        }
+    }
+    items
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, text)| {
+            let text = text?;
+            let display = text
+                .split(" // ")
+                .next()
+                .unwrap_or_default()
+                .trim()
+                .to_owned();
+            Some(ScriptLine {
+                id: format!("L{:03}", i + 1),
+                display,
+            })
+        })
+        .collect()
+}
+
+/// The text of a spoken line, `[1]{…} text` or `1: text`.
+fn spoken_text(line: &str) -> Option<&str> {
+    if let Some(rest) = line.strip_prefix('[') {
+        let (role, rest) = rest.split_once(']')?;
+        if role.is_empty() || !role.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        let rest = rest.trim_start();
+        let rest = match rest.strip_prefix('{') {
+            Some(attrs) => attrs.split_once('}').map_or("", |(_, after)| after),
+            None => rest,
+        };
+        return Some(rest.trim());
+    }
+    let digits = line
+        .find(|c: char| !c.is_ascii_digit())
+        .filter(|&n| n > 0)?;
+    let rest = &line[digits..];
+    let text = rest.trim_start_matches([' ', '\t', ':', '：', '.', '、']);
+    (text.len() < rest.len() && !text.is_empty()).then_some(text)
+}
+
+fn role_of(line: &Line) -> Option<String> {
+    match &line.role {
+        serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        _ => None,
     }
 }
 
@@ -284,6 +477,84 @@ mod tests {
             .map(|v| (v.start, v.end))
             .collect();
         assert_eq!(spans, [(0.0, 2.5), (2.5, 5.0), (5.0, 8.0)]);
+
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    const SCRIPT: &str = "# hỏi đường\n[1] すみません、駅{えき}はどこですか。\n[2]{emotion=happy, speed=slow} あ、駅ですか。 // À, nhà ga à.\n[1] ありがとうございます。\n[pause=1500]\n[3]{emotion=surprised} えっ、田中{たなか}さん！\n    久しぶりですね。\n4: 本当(ほんとう)に。\n";
+
+    #[test]
+    fn parses_textts_scripts_with_textts_ids() {
+        let lines = parse_script(SCRIPT);
+        let pairs: Vec<_> = lines
+            .iter()
+            .map(|l| (l.id.as_str(), l.display.as_str()))
+            .collect();
+        assert_eq!(
+            pairs,
+            [
+                ("L001", "すみません、駅{えき}はどこですか。"),
+                ("L002", "あ、駅ですか。"),
+                ("L003", "ありがとうございます。"),
+                ("L005", "えっ、田中{たなか}さん！久しぶりですね。"),
+                ("L006", "本当(ほんとう)に。"),
+            ]
+        );
+    }
+
+    #[test]
+    fn subtitles_take_the_scripts_furigana() {
+        let dir = std::env::temp_dir().join(format!("opencut-textts-ruby-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("hoi.mp3"), b"x").unwrap();
+        std::fs::write(dir.join("hoi.txt"), SCRIPT).unwrap();
+        // What textts writes: plain text with the speaker in front.
+        std::fs::write(
+            dir.join("hoi.srt"),
+            "1\n00:00:02,000 --> 00:00:04,000\n[1] すみません、駅はどこですか。\n\n2\n00:00:04,600 --> 00:00:06,000\n[2] あ、駅ですか。\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("hoi.timeline.json"),
+            r#"{"duration_ms": 9000, "items": [
+                {"id": "L001", "role": "1", "start_ms": 2000, "end_ms": 4000},
+                {"id": "L002", "role": "2", "start_ms": 4600, "end_ms": 6000},
+                {"id": "L005", "role": "3", "start_ms": 7500, "end_ms": 8800}]}"#,
+        )
+        .unwrap();
+
+        let import = TexttsImport {
+            audio: dir.join("hoi.mp3"),
+            ..TexttsImport::default()
+        };
+        // Without the script: textts' plain text, the speaker moved to `role`.
+        let plain = import_textts(&import, &dir).unwrap();
+        assert_eq!(plain.subtitles[0].text, "すみません、駅はどこですか。");
+        assert_eq!(plain.subtitles[1].role.as_deref(), Some("2"));
+
+        let import = TexttsImport {
+            script: Some(dir.join("hoi.txt")),
+            ..import
+        };
+        let project = import_textts(&import, &dir).unwrap();
+        let texts: Vec<_> = project
+            .subtitles
+            .iter()
+            .map(|c| (c.text.as_str(), c.role.as_deref()))
+            .collect();
+        assert_eq!(
+            texts,
+            [
+                ("すみません、駅{えき}はどこですか。", Some("1")),
+                ("あ、駅ですか。", Some("2")),
+                ("えっ、田中{たなか}さん！久しぶりですね。", Some("3")),
+            ]
+        );
+        assert!(
+            crate::write_vtt(&project.subtitles)
+                .contains("<v 3>えっ、<ruby>田中<rt>たなか</rt></ruby>さん！")
+        );
+        assert!(crate::write_srt(&project.subtitles).contains("えっ、田中さん！久しぶりですね。"));
 
         std::fs::remove_dir_all(dir).ok();
     }

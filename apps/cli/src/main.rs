@@ -59,6 +59,12 @@ enum Command {
         /// Defaults to `<name>.timeline.json` beside the audio.
         #[arg(long)]
         timeline: Option<PathBuf>,
+        /// textts script (.txt) or project (.json): keeps furigana in the subtitles.
+        #[arg(long)]
+        script: Option<PathBuf>,
+        /// Loudness to bring the mix to, in LUFS (default -16).
+        #[arg(long, allow_hyphen_values = true)]
+        loudness: Option<f64>,
         /// Slide image; repeat in order (one per scene, one per line, or spread evenly).
         #[arg(long = "slide")]
         slides: Vec<PathBuf>,
@@ -129,6 +135,8 @@ fn main() -> Result<()> {
             output,
             srt,
             timeline,
+            script,
+            loudness,
             slides,
             title,
             width,
@@ -141,6 +149,8 @@ fn main() -> Result<()> {
                 project: output,
                 srt,
                 timeline,
+                script,
+                loudness_lufs: loudness,
                 slides,
                 title,
                 width,
