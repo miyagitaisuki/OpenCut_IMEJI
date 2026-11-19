@@ -72,9 +72,9 @@ A scene picks gestures over time:
 (`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
 is her smile once she has finished speaking.
 
-`demo` (original SVG art) is the only avatar in the repository. Avatars
-made from your own art, such as `sakura`, stay out of git by default
-(see `.gitignore`), since this repository is public.
+`demo` (original SVG art) and `sakura` (the owner's own character, a rigged PNG set) are in
+the repository. Put an avatar made from someone else's art in `public/avatars/` and
+add it to `.gitignore` if it should stay out of git.
 
 ## Licence
 
