@@ -9,15 +9,31 @@
   "gestures": [
     {
       "at": 0,
+      "gesture": "rest"
+    },
+    {
+      "at": 0.9,
       "gesture": "explain"
     },
     {
       "at": 2.6,
-      "gesture": "point"
+      "gesture": "pointer"
     },
     {
-      "at": 5.2,
+      "at": 4.6,
       "gesture": "tip"
+    }
+  ],
+  "effects": [
+    {
+      "at": 2.6,
+      "type": "exclamation",
+      "duration": 1.2
+    },
+    {
+      "at": 4.6,
+      "type": "lightbulb",
+      "duration": 1.4
     }
   ]
 }

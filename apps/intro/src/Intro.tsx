@@ -43,9 +43,10 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
           frame={frame}
           fps={fps}
           mouth={mouthAt(visemes, talking)}
-          gesture={gestureAt(scene.gestures, talking)}
+          gesture={gestureTimeline(scene.gestures, talking, LEAD_IN, fps)}
           smiling={talking > voiceSeconds + 0.3}
         />
+        {scene.effects && <Effects avatar={avatar} effects={scene.effects} frame={frame} fps={fps} />}
       </div>
       <div
         style={{
@@ -86,19 +87,28 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
   );
 };
 
+type GestureState = {
+  current?: string;
+  previous?: string;
+  /** Video frame the current gesture began on. */
+  startFrame: number;
+};
+
 const Avatar: React.FC<{
   avatar: IntroProps["avatar"];
   frame: number;
   fps: number;
   mouth: keyof IntroProps["avatar"]["layers"]["mouth"];
-  gesture?: string;
+  gesture: GestureState;
   smiling: boolean;
 }> = ({ avatar, frame, fps, mouth, gesture, smiling }) => {
   const [w, h] = avatar.size;
   const scale = 1040 / h;
+  const height = h * scale;
   const base = `avatars/${avatar.folder}/`;
   const layer = (file: string, style?: React.CSSProperties) => (
     <Img
+      key={file}
       src={staticFile(base + file)}
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", ...style }}
     />
@@ -109,13 +119,7 @@ const Avatar: React.FC<{
       : blinking(frame, fps)
         ? avatar.layers.eyes_closed
         : avatar.layers.eyes_open;
-  const face = (
-    <>
-      {layer(eyes)}
-      {layer(avatar.layers.mouth[mouth])}
-    </>
-  );
-  const box: React.CSSProperties = { position: "relative", width: w * scale, height: h * scale };
+  const box: React.CSSProperties = { position: "relative", width: w * scale, height };
 
   const rig = avatar.rig;
   if (!rig) {
@@ -125,36 +129,71 @@ const Avatar: React.FC<{
     return (
       <div style={{ ...box, transform: `translateY(${bob}px) rotate(${sway}deg)`, transformOrigin: "50% 100%" }}>
         {avatar.layers.body && layer(avatar.layers.body)}
-        {face}
+        {layer(eyes)}
+        {layer(avatar.layers.mouth[mouth])}
       </div>
     );
   }
 
-  // Head tilt ±2.5°, back hair ±3.5° a few frames behind it, breathing ±2 px.
-  const headRotate = Math.sin(frame / 30) * 2.5;
-  const hairRotate = Math.sin((frame - 6) / 30) * 3.5;
-  const breatheY = Math.sin(frame / 25) * 2;
-  const arms = rig.arms[gesture ?? ""] ?? Object.values(rig.arms)[0];
   const [nx, ny] = rig.neck;
+  const speaking = mouth !== "n";
+
+  // Breathing: the torso stretches from the hips (scaleY); whatever sits on
+  // it (arms at the shoulders, the head at the neck) rides up with it.
+  const breathe = 1 + Math.sin(frame / 22) * 0.012;
+  const lift = (yFraction: number) => -(breathe - 1) * height * (1 - yFraction);
+
+  // A gesture change is a beat, not a cut: the arms dip and spring back while
+  // the old pose fades out over 3 frames, the body dips a little with them.
+  const since = frame - gesture.startFrame;
+  const swap = spring({ frame: since, fps, config: { damping: 14, stiffness: 220 } });
+  const armBounce = gesture.previous ? (1 - swap) * 14 : 0;
+  const bodyDip = gesture.previous ? (1 - swap) * 6 : 0;
+  const fadeIn = gesture.previous ? Math.min(1, Math.max(0, since / 3)) : 1;
+  const arms = rig.arms[gesture.current ?? ""] ?? Object.values(rig.arms)[0];
+  const previousArms = gesture.previous ? rig.arms[gesture.previous] : undefined;
+
+  // Head: slow tilt, leaning with the gesture, a small nod while speaking.
+  const headTilt = Math.sin(frame / 28) * 2.5 + (gesture.current === "tip" ? -2 : gesture.current ? 1.5 : 0);
+  const nod = speaking ? Math.sin(frame * 0.6) * 1.5 : 0;
+  const hairRotate = Math.sin((frame - 6) / 30) * 3.5;
+
+  // A glance towards the board (on her left, the viewer's right) for a second
+  // after she starts presenting it, then back to the learners.
+  const presenting = ["explain", "point", "pointer"].includes(gesture.current ?? "");
+  const glance = presenting
+    ? interpolate(since, [0, 6, fps * 0.9, fps * 1.2], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+    : 0;
+  const glanceX = glance * 5;
+
+  const shoulderY = lift(0.425) + bodyDip;
   return (
     <div style={box}>
       {rig.hair_back &&
         layer(rig.hair_back, {
-          transform: `translateY(${breatheY}px) rotate(${hairRotate}deg)`,
+          transform: `translateY(${lift(ny) + bodyDip}px) rotate(${hairRotate}deg)`,
           transformOrigin: `${nx * 100}% ${ny * 100 - 10}%`,
         })}
-      {layer(rig.torso, { transform: `translateY(${breatheY}px)` })}
-      {arms && layer(arms, { transform: `translateY(${breatheY * 1.2}px)` })}
+      {layer(rig.torso, {
+        transform: `translateY(${bodyDip}px) scaleY(${breathe})`,
+        transformOrigin: "50% 100%",
+      })}
+      {/* The old pose stays solid underneath until the new one, fading in
+          on top, has covered it: no see-through arms mid-swap. */}
+      {previousArms && fadeIn < 1 && layer(previousArms, { transform: `translateY(${shoulderY}px)` })}
+      {arms && layer(arms, { opacity: fadeIn, transform: `translateY(${shoulderY + armBounce}px)` })}
+      {rig.shoulders && layer(rig.shoulders, { transform: `translateY(${shoulderY}px)` })}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          transform: `translateY(${breatheY}px) rotate(${headRotate}deg)`,
+          transform: `translateY(${lift(ny) + bodyDip + nod}px) rotate(${headTilt}deg)`,
           transformOrigin: `${nx * 100}% ${ny * 100}%`,
         }}
       >
         {layer(rig.head)}
-        {face}
+        {layer(eyes, { transform: `translateX(${glanceX}px)` })}
+        {layer(avatar.layers.mouth[mouth])}
       </div>
     </div>
   );
@@ -162,12 +201,63 @@ const Avatar: React.FC<{
 
 /** The gesture at `seconds` of speech: the last one started by then. */
 export function gestureAt(gestures: { at: number; gesture: string }[] | undefined, seconds: number): string | undefined {
-  let current: string | undefined;
-  for (const g of [...(gestures ?? [])].sort((a, b) => a.at - b.at)) {
-    if (g.at <= seconds) current = g.gesture;
-  }
-  return current;
+  return gestureTimeline(gestures, seconds, 0, 1).current;
 }
+
+/** The current gesture, the one before it, and the frame it started on. */
+export function gestureTimeline(
+  gestures: { at: number; gesture: string }[] | undefined,
+  seconds: number,
+  leadIn: number,
+  fps: number,
+): GestureState {
+  const sorted = [...(gestures ?? [])].sort((a, b) => a.at - b.at);
+  let state: GestureState = { startFrame: 0 };
+  for (const g of sorted) {
+    if (g.at > seconds) break;
+    state = { current: g.gesture, previous: state.current, startFrame: Math.round((leadIn + g.at) * fps) };
+  }
+  return state;
+}
+
+/** Anime sticker effects (💡 💧 ✨ ❗) popping beside her head. */
+const Effects: React.FC<{
+  avatar: IntroProps["avatar"];
+  effects: { at: number; type: string; duration?: number }[];
+  frame: number;
+  fps: number;
+}> = ({ avatar, effects, frame, fps }) => {
+  const [w, h] = avatar.size;
+  const scale = 1040 / h;
+  return (
+    <>
+      {effects.map((effect, i) => {
+        const file = avatar.fx?.[effect.type];
+        const start = Math.round((LEAD_IN + effect.at) * fps);
+        const end = start + Math.round((effect.duration ?? 1.6) * fps);
+        if (!file || frame < start || frame > end + 8) return null;
+        const pop = spring({ frame: frame - start, fps, config: { damping: 12, stiffness: 180 } });
+        const out = interpolate(frame, [end, end + 8], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        const bob = Math.sin((frame - start) / 6) * 4;
+        return (
+          <Img
+            key={i}
+            src={staticFile(`avatars/${avatar.folder}/${file}`)}
+            style={{
+              position: "absolute",
+              // Up and to the right of her head.
+              left: w * scale * 0.64,
+              top: h * scale * 0.04 + bob,
+              width: 150,
+              transform: `scale(${pop})`,
+              opacity: Math.min(1, pop * 1.5) * out,
+            }}
+          />
+        );
+      })}
+    </>
+  );
+};
 
 /** Blinks every 2.5–4 s for about 0.12 s, the same way on every render. */
 function blinking(frame: number, fps: number): boolean {

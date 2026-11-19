@@ -21,6 +21,8 @@ export type Scene = {
   colors?: [string, string];
   /** Gestures over time, for rigged avatars: from `at` seconds of speech on. */
   gestures?: { at: number; gesture: string }[];
+  /** Sticker effects (avatar `fx` names) popping beside her head, `at` seconds of speech. */
+  effects?: { at: number; type: string; duration?: number }[];
 };
 
 export type AvatarManifest = {
@@ -41,7 +43,11 @@ export type AvatarManifest = {
     arms: Record<string, string>;
     /** Neck joint, as fractions of the canvas, for the head's tilt. */
     neck: [number, number];
+    /** The cardigan's shoulder caps, drawn over the arms to hide the seam. */
+    shoulders?: string;
   };
+  /** Sticker effects by name, e.g. lightbulb, sweat, sparkle, exclamation. */
+  fx?: Record<string, string>;
   layers: {
     body?: string;
     eyes_open: string;
