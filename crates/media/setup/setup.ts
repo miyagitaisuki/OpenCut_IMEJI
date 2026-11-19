@@ -246,8 +246,9 @@ function configureFlags(target: Platform, host: Platform): string[] {
     }
     case "linux":
       if (cross) throw new Error("Linux builds are made on a machine of the same architecture");
-      // libavcodec finds libopenh264 beside itself, wherever the app puts them.
-      flags.push("--extra-ldflags=-Wl,-rpath,'$ORIGIN'");
+      // No RUNPATH of its own on purpose: a library with one makes the loader
+      // ignore the program's (non-transitive) RPATH for its dependencies, and
+      // libopenh264 sits in the same lib/ that RPATH names.
       break;
   }
 

@@ -11,7 +11,7 @@ on:
       build:
         description: "Build number for this FFmpeg version (bump it to rebuild the same version)"
         required: true
-        default: "2"
+        default: "3"
 
 permissions:
   contents: write
@@ -87,8 +87,11 @@ jobs:
         if: startsWith(matrix.platform, 'linux-')
         run: |
           lib=.cache/media/ffmpeg-${{ steps.pins.outputs.ffmpeg }}-${{ matrix.platform }}/lib
-          readelf -d "$lib"/libavcodec.so | grep -E 'openh264|RUNPATH|RPATH'
+          readelf -d "$lib"/libavcodec.so | grep -E 'openh264|RUNPATH|RPATH' || true
           grep -q libopenh264 <(readelf -d "$lib"/libavcodec.so)
+          # A RUNPATH (even an empty one) stops the program's RPATH from
+          # finding libopenh264.so.8 beside libavcodec.
+          ! grep -qE 'RUNPATH|RPATH' <(readelf -d "$lib"/libavcodec.so)
 
       - name: Package
         shell: bash
