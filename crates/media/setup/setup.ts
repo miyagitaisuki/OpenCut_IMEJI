@@ -218,6 +218,9 @@ function configureFlags(target: Platform, host: Platform): string[] {
         `--arch=${target.arch}`,
         `--cross-prefix=${prefix}`,
         "--enable-cross-compile",
+        // Cross builds default to no pkg-config at all ("false"), and
+        // libopenh264 is found only through it.
+        "--pkg-config=pkg-config",
         // Windows' own threads, so the DLLs need nothing but the system.
         "--disable-pthreads",
         "--enable-w32threads",
