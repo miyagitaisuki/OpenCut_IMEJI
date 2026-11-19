@@ -233,8 +233,8 @@ impl Project {
             || c.height < 16
             || c.width > 7680
             || c.height > 4320
-            || c.width % 2 != 0
-            || c.height % 2 != 0
+            || !c.width.is_multiple_of(2)
+            || !c.height.is_multiple_of(2)
         {
             problems.push(format!(
                 "canvas {}x{}: sides must be even, 16 to 7680x4320",

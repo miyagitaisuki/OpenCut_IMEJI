@@ -70,14 +70,14 @@ pub fn decode_audio(
                     decoded.channel_layout(),
                     decoded.rate(),
                     target_format,
-                    target_layout.clone(),
+                    target_layout,
                     sample_rate,
                 )?);
             }
             // Room for every resampled sample, so none pile up inside the resampler.
             let capacity =
                 decoded.samples() * sample_rate as usize / decoded.rate().max(1) as usize + 256;
-            let mut converted = frame::Audio::new(target_format, capacity, target_layout.clone());
+            let mut converted = frame::Audio::new(target_format, capacity, target_layout);
             resampler
                 .as_mut()
                 .expect("set above")
@@ -104,7 +104,7 @@ pub fn decode_audio(
     if let Some(resampler) = resampler.as_mut() {
         loop {
             // A frame of the output's own layout: an empty one reads as "output changed".
-            let mut converted = frame::Audio::new(target_format, 4096, target_layout.clone());
+            let mut converted = frame::Audio::new(target_format, 4096, target_layout);
             let delay = resampler.flush(&mut converted)?;
             push_packed(&converted, channels, &mut samples);
             if delay.is_none() || converted.samples() == 0 {
