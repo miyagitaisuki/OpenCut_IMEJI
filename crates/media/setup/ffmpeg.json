@@ -7,20 +7,20 @@
   },
   "platforms": {
     "linux-aarch64": {
-      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-2/ffmpeg-8.1.3-linux-aarch64.tar.gz",
-      "sha256": "cb2f427b7708405e1e6005360e0581d42c1e3bf7453bbe5ca02d3de83b5d9174"
+      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-3/ffmpeg-8.1.3-linux-aarch64.tar.gz",
+      "sha256": "edac2cc1ed4fa83a5dcb9786584714025b924cedb1170908f4ae341c11cbb4a7"
     },
     "linux-x86_64": {
-      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-2/ffmpeg-8.1.3-linux-x86_64.tar.gz",
-      "sha256": "2ee61d45a0638bf56dcccd60bfacfc4c68908caa55441647c305f2a7deb2d638"
+      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-3/ffmpeg-8.1.3-linux-x86_64.tar.gz",
+      "sha256": "e69a2240ab1073aabcb7fc126005bca745263ab9194f9311103364d7fcc6c236"
     },
     "windows-aarch64": {
-      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-2/ffmpeg-8.1.3-windows-aarch64.tar.gz",
-      "sha256": "ed3b043a9ea73d8271ab82f77f4eacff65ca324530dd94abcb5814c6bf1710c5"
+      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-3/ffmpeg-8.1.3-windows-aarch64.tar.gz",
+      "sha256": "73b5cfa3ae7516ff56f3b9c7e092fee4ff4503d128eb142e43d741bf690026c8"
     },
     "windows-x86_64": {
-      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-2/ffmpeg-8.1.3-windows-x86_64.tar.gz",
-      "sha256": "e48728ac3b9963e5da4f7d8b2fe782b9935706445a920236d6b4045dab7d5762"
+      "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-3/ffmpeg-8.1.3-windows-x86_64.tar.gz",
+      "sha256": "0a9e062db63302acd99b117d7c5f504270d20466ea8710a7c36b6e068756049e"
     }
   },
   "openh264": {
