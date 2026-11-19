@@ -9,10 +9,10 @@ const server = serveMock();
 afterAll(() => server.stop());
 
 test("voices a scene and times the mouth to it", async () => {
-  const { props, voice } = await speak(`${import.meta.dir}/../scenes/n4-teshimau.json`, `http://127.0.0.1:${server.port}`);
+  const { props, voice } = await speak(`${import.meta.dir}/../scenes/demo.json`, `http://127.0.0.1:${server.port}`);
   const written: IntroProps = JSON.parse(readFileSync(props, "utf8"));
-  expect(written.avatar.folder).toBe("sakura");
-  expect(written.voice).toBe("voices/n4-teshimau.wav");
+  expect(written.avatar.folder).toBe("demo");
+  expect(written.voice).toBe("voices/demo.wav");
   expect(written.voiceSeconds).toBeGreaterThan(3);
   expect(new Set(written.visemes.map((v) => v.mouth))).toEqual(new Set(["a", "i", "u", "e", "o", "n"]));
   // Shapes never overlap and stay inside the voice.

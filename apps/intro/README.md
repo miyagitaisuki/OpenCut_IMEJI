@@ -53,11 +53,14 @@ port 10101 (a tone instead of a voice, rough mora timing) to try the pipeline.
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one
-image per layer, all the same size, stacked: `body`, `eyes_open` /
-`eyes_closed`, and a mouth for each of `a i u e o n`. `sakura` is
-placeholder art (an original character drawn as SVG): replace any layer
-with a PNG of the same size and name it in `avatar.json`. VRoid or Inochi2D
-renders, or a commissioned drawing, work the same once split into layers.
+image per layer, all the same size and stacked: `body` (the character
+without a face), `eyes_open` / `eyes_closed`, and a mouth for each of
+`a i u e o n` (`n` is the closed mouth). Layers are PNG or SVG with a
+transparent background; each one is drawn where it sits on the face.
+
+`demo` (original SVG art) is the only avatar in the repository. Avatars
+made from your own art, such as `sakura`, stay out of git by default
+(see `.gitignore`), since this repository is public.
 
 ## Licence
 

@@ -1,6 +1,6 @@
 {
-  "name": "さくら",
-  "note": "Placeholder art made for OpenCut IMEJI (an original character, free to replace). Swap any layer for a PNG of the same size: only the file names here change.",
+  "name": "デモ",
+  "note": "Demo art made for OpenCut IMEJI (an original character, free to replace). Swap any layer for a PNG of the same size: only the file names here change.",
   "size": [800, 1000],
   "layers": {
     "body": "body.svg",
