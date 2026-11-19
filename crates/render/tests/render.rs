@@ -88,6 +88,7 @@ fn renders_slides_audio_and_sidecars() {
             end: 1.5,
             text: "こんにちは".into(),
             role: Some("1".into()),
+            translation: Some("Xin chào".into()),
         }],
         markers: vec![Marker {
             time: 1.8,
@@ -173,7 +174,7 @@ fn renders_slides_audio_and_sidecars() {
 
     let vtt = std::fs::read_to_string(dir.join("lesson.vtt")).unwrap();
     assert!(
-        vtt.contains("00:00:00.200 --> 00:00:01.500\n<v 1>こんにちは"),
+        vtt.contains("00:00:00.200 --> 00:00:01.500\n<v 1>こんにちは\n<c.tr>Xin chào</c>"),
         "{vtt}"
     );
     let markers = std::fs::read_to_string(dir.join("lesson.markers.json")).unwrap();

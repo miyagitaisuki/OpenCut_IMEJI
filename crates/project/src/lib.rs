@@ -157,6 +157,9 @@ pub struct Cue {
     /// Speaker, e.g. textts role `1`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+    /// Shown under `text`, e.g. the Vietnamese under the Japanese.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub translation: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

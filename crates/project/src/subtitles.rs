@@ -36,6 +36,7 @@ pub fn parse_srt(text: &str) -> Vec<Cue> {
             end,
             text: body.join("\n"),
             role: None,
+            translation: None,
         });
     }
     cues
@@ -49,14 +50,22 @@ pub fn write_srt(cues: &[Cue]) -> String {
             i + 1,
             timestamp(cue.start, ','),
             timestamp(cue.end, ','),
-            ruby::to_plain(&cue.text)
+            match &cue.translation {
+                Some(translation) => format!("{}\n{translation}", ruby::to_plain(&cue.text)),
+                None => ruby::to_plain(&cue.text),
+            }
         );
     }
     out
 }
 
+/// The Japanese on top, its translation on the line under it (class `tr`,
+/// styled a little apart so the two read as separate lines).
 pub fn write_vtt(cues: &[Cue]) -> String {
     let mut out = String::from("WEBVTT\n\n");
+    if cues.iter().any(|cue| cue.translation.is_some()) {
+        out += "STYLE\n::cue(.tr) {\n  color: #ffe58a;\n}\n\n";
+    }
     for cue in cues {
         // A blank line ends a cue in WebVTT, so a cue's own blank lines go.
         let text = cue
@@ -68,6 +77,18 @@ pub fn write_vtt(cues: &[Cue]) -> String {
             .join("\n");
         let text = match &cue.role {
             Some(role) => format!("<v {}>{text}", role.replace('>', "")),
+            None => text,
+        };
+        let text = match cue
+            .translation
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+        {
+            Some(translation) => {
+                let translation = translation.split_whitespace().collect::<Vec<_>>().join(" ");
+                format!("{text}\n<c.tr>{}</c>", ruby::to_vtt(&translation))
+            }
             None => text,
         };
         out += &format!(

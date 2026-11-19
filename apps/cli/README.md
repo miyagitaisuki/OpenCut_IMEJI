@@ -33,6 +33,9 @@ opencut render lesson/bai10.project.json        # lesson/bai10.mp4 (+ .vtt .srt 
   `--script` (the textts `.txt`, or a project `.json` saved with `--save-project`) they keep the
   script's furigana: `駅{えき}` becomes `<ruby>駅<rt>えき</rt></ruby>` in the `.vtt`, so HTML
   players show the reading above the kanji. The `.srt` has no ruby and shows `駅`.
+- **Translations** after ` // ` in the script (or `translation` in a textts project) go under
+  each line: Japanese on top, the translation on the next line (class `tr` in the `.vtt`,
+  the second line in the `.srt`).
 - **Slides** are spread one per scene (`[bgm=…]` in the script), one per line, or evenly.
 - **Loudness**: the whole mix is brought to `loudness_lufs` in the project (-16 LUFS by
   default, `--loudness` to change it), never above -1 dBTP. The render report says what it measured.

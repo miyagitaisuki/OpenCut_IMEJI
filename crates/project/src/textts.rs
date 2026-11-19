@@ -230,6 +230,8 @@ fn strip_role_prefix(cue: &mut Cue) {
 struct ScriptLine {
     id: String,
     display: String,
+    /// After ` // ` in the script: the line in the learners' language.
+    translation: Option<String>,
 }
 
 /// Subtitles in the script's own text. Matched by id against the timeline
@@ -242,20 +244,19 @@ fn with_furigana(
     if let Some(timeline) =
         timeline.filter(|t| !t.items.is_empty() && t.items.iter().all(|i| !i.id.is_empty()))
     {
-        let by_id: std::collections::HashMap<&str, &str> = lines
-            .iter()
-            .map(|line| (line.id.as_str(), line.display.as_str()))
-            .collect();
+        let by_id: std::collections::HashMap<&str, &ScriptLine> =
+            lines.iter().map(|line| (line.id.as_str(), line)).collect();
         let rebuilt: Option<Vec<Cue>> = timeline
             .items
             .iter()
             .map(|item| {
-                let display = by_id.get(item.id.as_str())?;
+                let line = by_id.get(item.id.as_str())?;
                 Some(Cue {
                     start: item.start_ms / 1000.0,
                     end: item.end_ms.max(item.start_ms + 1.0) / 1000.0,
-                    text: (*display).to_owned(),
+                    text: line.display.clone(),
                     role: role_of(item),
+                    translation: line.translation.clone(),
                 })
             })
             .collect();
@@ -268,6 +269,7 @@ fn with_furigana(
             .zip(lines)
             .map(|(cue, line)| Cue {
                 text: line.display.clone(),
+                translation: line.translation.clone(),
                 ..cue
             })
             .collect()
@@ -293,6 +295,8 @@ fn script_lines(path: &Path) -> Result<Vec<ScriptLine>> {
         kind: String,
         #[serde(default)]
         display: String,
+        #[serde(default)]
+        translation: String,
     }
     let project: Project = serde_json::from_str(&text).map_err(|source| Error::Json {
         path: path.to_owned(),
@@ -305,6 +309,7 @@ fn script_lines(path: &Path) -> Result<Vec<ScriptLine>> {
         .map(|item| ScriptLine {
             id: item.id,
             display: item.display,
+            translation: Some(item.translation.trim().to_owned()).filter(|t| !t.is_empty()),
         })
         .collect())
 }
@@ -338,15 +343,14 @@ fn parse_script(text: &str) -> Vec<ScriptLine> {
         .enumerate()
         .filter_map(|(i, text)| {
             let text = text?;
-            let display = text
-                .split(" // ")
-                .next()
-                .unwrap_or_default()
-                .trim()
-                .to_owned();
+            let (display, translation) = match text.split_once(" // ") {
+                Some((display, translation)) => (display, Some(translation.trim().to_owned())),
+                None => (text.as_str(), None),
+            };
             Some(ScriptLine {
                 id: format!("L{:03}", i + 1),
-                display,
+                display: display.trim().to_owned(),
+                translation: translation.filter(|t| !t.is_empty()),
             })
         })
         .collect()
@@ -554,6 +558,17 @@ mod tests {
             crate::write_vtt(&project.subtitles)
                 .contains("<v 3>えっ、<ruby>田中<rt>たなか</rt></ruby>さん！")
         );
+        // The line with ` // ` in the script carries its translation, under it.
+        assert_eq!(
+            project.subtitles[1].translation.as_deref(),
+            Some("À, nhà ga à.")
+        );
+        assert!(
+            crate::write_vtt(&project.subtitles)
+                .contains("<v 2>あ、駅ですか。\n<c.tr>À, nhà ga à.</c>")
+        );
+        assert!(crate::write_srt(&project.subtitles).contains("あ、駅ですか。\nÀ, nhà ga à.\n"));
+        assert_eq!(project.subtitles[0].translation, None);
         assert!(crate::write_srt(&project.subtitles).contains("えっ、田中さん！久しぶりですね。"));
 
         std::fs::remove_dir_all(dir).ok();
