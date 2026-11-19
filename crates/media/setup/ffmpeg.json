@@ -22,5 +22,24 @@
       "url": "https://github.com/miyagitaisuki/OpenCut_IMEJI/releases/download/ffmpeg-8.1.3-1/ffmpeg-8.1.3-windows-x86_64.tar.gz",
       "sha256": "2f00d80cd55bfa2584c0be46f6a742bf7866c25c8e43e75a52ac82aa1373167d"
     }
+  },
+  "openh264": {
+    "version": "2.6.0",
+    "tag": "v2.6.0",
+    "repository": "https://github.com/cisco/openh264.git",
+    "binaries": {
+      "linux-x86_64": {
+        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux64.8.so.bz2"
+      },
+      "linux-aarch64": {
+        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux-arm64.8.so.bz2"
+      },
+      "windows-x86_64": {
+        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win64.dll.bz2"
+      },
+      "windows-aarch64": {
+        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win-arm64.dll.bz2"
+      }
+    }
   }
 }

@@ -82,6 +82,97 @@ function extract(archive: string, into: string) {
   run([tar, "-xf", archive, "-C", into]);
 }
 
+
+const hasOpenH264 = (target: Platform) => keyOf(target) in manifest.openh264.binaries;
+
+type OpenH264 = { include: string; lib: string };
+const openh264 = manifest.openh264 as {
+  version: string;
+  tag: string;
+  repository: string;
+  binaries: Record<string, { url: string; sha256?: string }>;
+};
+
+/// Decompresses a Cisco `.bz2` with whatever this machine has: bzip2, or
+/// Python's bz2 module (every Windows machine running textts has Python).
+function bunzip2(from: string, to: string) {
+  for (const command of [["bzip2", "-dc", from], ["python3", "-c", PY_BZ2, from], ["python", "-c", PY_BZ2, from]]) {
+    if (!Bun.which(command[0])) continue;
+    const result = Bun.spawnSync(command, { stdout: "pipe", stderr: "ignore" });
+    if (result.exitCode === 0) {
+      writeFileSync(to, result.stdout);
+      return;
+    }
+  }
+  throw new Error("cannot decompress .bz2: install bzip2 or Python");
+}
+const PY_BZ2 = "import bz2,sys;sys.stdout.buffer.write(bz2.open(sys.argv[1]).read())";
+
+/// Cisco's OpenH264 binary for `target`, saved as `name` in `dir`. FFmpeg
+/// loads it at run time. It is Cisco's own unmodified build, fetched from
+/// Cisco: that build is the one Cisco's patent licence covers, and it is
+/// never repackaged into our archives.
+async function fetchOpenH264Binary(target: Platform, dir: string, name: string) {
+  const binary = openh264.binaries[keyOf(target)];
+  if (!binary) throw new Error(`no OpenH264 binary for ${keyOf(target)}`);
+  console.log(`downloading ${binary.url}`);
+  const response = await fetch(binary.url);
+  if (!response.ok) throw new Error(`download failed: ${response.status} ${binary.url}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const actual = createHash("sha256").update(bytes).digest("hex");
+  if (binary.sha256 && actual !== binary.sha256) {
+    throw new Error(`checksum mismatch for ${binary.url}\n  expected ${binary.sha256}\n  got      ${actual}`);
+  }
+  if (!binary.sha256) console.warn(`OpenH264 ${keyOf(target)} is not pinned; sha256 ${actual}`);
+  mkdirSync(dir, { recursive: true });
+  const compressed = join(dir, `${name}.bz2`);
+  writeFileSync(compressed, bytes);
+  bunzip2(compressed, join(dir, name));
+  rmSync(compressed);
+}
+
+/// What `./configure --enable-libopenh264` links against: OpenH264's headers
+/// (from its tagged source) and a library to link. The library itself is
+/// Cisco's binary; on Windows an import library is made from its exports.
+async function prepareOpenH264(staging: string, target: Platform): Promise<OpenH264> {
+  const root = join(staging, "openh264");
+  const source = join(root, "source");
+  run(["git", "clone", "--depth", "1", "--branch", openh264.tag, openh264.repository, source]);
+  const include = join(root, "include");
+  mkdirSync(join(include, "wels"), { recursive: true });
+  for (const header of readdirSync(join(source, "codec", "api", "wels"))) {
+    copyFileSync(join(source, "codec", "api", "wels", header), join(include, "wels", header));
+  }
+  const lib = join(root, "lib");
+  if (target.os === "windows") {
+    const arch = target.arch === "x86_64" ? "win64" : "win-arm64";
+    const dll = `openh264-${openh264.version}-${arch}.dll`;
+    mkdirSync(lib, { recursive: true });
+    // The exports FFmpeg's libopenh264 wrapper uses.
+    writeFileSync(
+      join(lib, "openh264.def"),
+      [`LIBRARY ${dll}`, "EXPORTS", ...["WelsCreateSVCEncoder", "WelsDestroySVCEncoder", "WelsGetCodecVersion", "WelsGetCodecVersionEx"].map((n) => `    ${n}`), ""].join("\n"),
+    );
+    const machine = target.arch === "x86_64" ? "i386:x86-64" : "arm64";
+    run([`${target.arch}-w64-mingw32-dlltool`, "-d", join(lib, "openh264.def"), "-l", join(lib, "libopenh264.dll.a"), "-m", machine]);
+  } else {
+    await fetchOpenH264Binary(target, lib, "libopenh264.so.8");
+    symlinkSync("libopenh264.so.8", join(lib, "libopenh264.so"));
+  }
+  return { include, lib };
+}
+
+/// Puts Cisco's binary where FFmpeg finds it at run time: beside the DLLs
+/// on Windows, in lib/ (on the rpath) elsewhere.
+async function installOpenH264Runtime(prefix: string, target: Platform) {
+  if (target.os === "windows") {
+    const arch = target.arch === "x86_64" ? "win64" : "win-arm64";
+    await fetchOpenH264Binary(target, join(prefix, "bin"), `openh264-${openh264.version}-${arch}.dll`);
+  } else {
+    await fetchOpenH264Binary(target, join(prefix, "lib"), "libopenh264.so.8");
+  }
+}
+
 /// Configure flags for building FFmpeg for `target` on `host`. The same
 /// everywhere but for what a platform needs, so every platform decodes the
 /// same formats: shared LGPL libraries only, nothing picked up from
@@ -98,6 +189,9 @@ function configureFlags(target: Platform, host: Platform): string[] {
     "--disable-autodetect",
   ];
   const cross = target.os !== host.os || target.arch !== host.arch;
+  // H.264 encoding through Cisco's OpenH264 (everything else here is
+  // LGPL-only, and FFmpeg has no other H.264 encoder that is).
+  if (hasOpenH264(target)) flags.push("--enable-libopenh264");
 
   switch (target.os) {
     case "windows": {
@@ -127,6 +221,8 @@ function configureFlags(target: Platform, host: Platform): string[] {
     }
     case "linux":
       if (cross) throw new Error("Linux builds are made on a machine of the same architecture");
+      // libavcodec finds libopenh264 beside itself, wherever the app puts them.
+      flags.push("--extra-ldflags=-Wl,-rpath,'$ORIGIN'");
       break;
   }
 
@@ -147,12 +243,18 @@ async function buildFromSource(staging: string, target: Platform, flags: string[
   const source = join(staging, readdirSync(staging).find((name) => name !== "source.tar.xz")!);
   const prefix = join(staging, `ffmpeg-${manifest.version}-${keyOf(target)}`);
 
+  const linked = hasOpenH264(target) ? await prepareOpenH264(staging, target) : undefined;
+  const openh264Flags = linked
+    ? [`--extra-cflags=-I${linked.include}`, `--extra-ldflags=-L${linked.lib}`]
+    : [];
+
   console.log(`building FFmpeg ${manifest.version} for ${keyOf(target)}; this takes a few minutes`);
-  run(["./configure", `--prefix=${prefix}`, ...flags], source);
+  run(["./configure", `--prefix=${prefix}`, ...flags, ...openh264Flags], source);
   run(["make", `-j${availableParallelism()}`], source);
   run(["make", "install"], source);
   // Example programs; nothing the libraries need.
   rmSync(join(prefix, "share"), { recursive: true, force: true });
+  if (linked) await installOpenH264Runtime(prefix, target);
 
   if (target.os === "windows") {
     // DLLs stay in bin/; the import libraries MSVC links against go in lib/.
@@ -176,6 +278,13 @@ async function buildFromSource(staging: string, target: Platform, flags: string[
       "```",
       "",
       "Licensed under the LGPL 2.1 or later: see COPYING.LGPLv2.1 and LICENSE.md.",
+      ...(hasOpenH264(target)
+        ? [
+            "",
+            `H.264 encoding uses OpenH264 ${openh264.version} (BSD-2-Clause). Its binary is Cisco's own,`,
+            "downloaded from Cisco when this build is set up and not part of the archive.",
+          ]
+        : []),
       "",
     ].join("\n"),
   );
@@ -190,6 +299,13 @@ async function installPrebuilt(prebuilt: Download, staging: string): Promise<str
   extract(archive, staging);
   rmSync(archive);
   return join(staging, readdirSync(staging)[0]);
+}
+
+/// Archives leave Cisco's binary out: it is fetched from Cisco here.
+async function installPrebuiltWithOpenH264(prebuilt: Download, staging: string, target: Platform) {
+  const prefix = await installPrebuilt(prebuilt, staging);
+  if (hasOpenH264(target)) await installOpenH264Runtime(prefix, target);
+  return prefix;
 }
 
 /// Source build flags, or `undefined` where this machine cannot build the
@@ -223,7 +339,7 @@ async function main() {
   const flags = fromSource ? configureFlags(target, host) : [];
   const stamp = fromSource
     ? `source ${manifest.source.sha256} ${createHash("sha256").update(flags.join(" ")).digest("hex")}`
-    : `prebuilt ${prebuilt!.sha256}`;
+    : `prebuilt ${prebuilt!.sha256} openh264 ${hasOpenH264(target) ? manifest.openh264.version : "none"}`;
 
   const destination = join(cache, `ffmpeg-${manifest.version}-${key}`);
   const marker = join(destination, ".complete");
@@ -250,7 +366,7 @@ async function main() {
     built = await buildFromSource(staging, target, flags);
   } else {
     try {
-      built = await installPrebuilt(prebuilt!, staging);
+      built = await installPrebuiltWithOpenH264(prebuilt!, staging, target);
     } catch (error) {
       // Prebuilt hosts prune old builds; the pinned source still builds
       // wherever this machine can build it.
