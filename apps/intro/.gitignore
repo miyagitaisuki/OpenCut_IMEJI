@@ -4,7 +4,3 @@ out/
 public/voices/
 scenes/*.props.json
 !scenes/sample.props.json
-# Avatars made from your own art stay on your machine (this repo is public);
-# only the demo avatar is committed. Remove a line to publish one.
-public/avatars/*
-!public/avatars/demo/
