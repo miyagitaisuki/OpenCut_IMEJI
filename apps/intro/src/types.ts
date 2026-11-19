@@ -19,6 +19,8 @@ export type Scene = {
   speed?: number;
   /** `#rrggbb` pair for the background gradient. */
   colors?: [string, string];
+  /** Gestures over time, for rigged avatars: from `at` seconds of speech on. */
+  gestures?: { at: number; gesture: string }[];
 };
 
 export type AvatarManifest = {
@@ -26,10 +28,26 @@ export type AvatarManifest = {
   folder: string;
   name: string;
   size: [number, number];
+  /**
+   * A rigged avatar moves in parts, like a VTuber: back hair swaying a
+   * beat behind, the head tilting about the neck, arms by gesture.
+   * Without it, `layers.body` is one still picture.
+   */
+  rig?: {
+    hair_back?: string;
+    torso: string;
+    head: string;
+    /** Gesture name -> arms picture; the first is the default. */
+    arms: Record<string, string>;
+    /** Neck joint, as fractions of the canvas, for the head's tilt. */
+    neck: [number, number];
+  };
   layers: {
-    body: string;
+    body?: string;
     eyes_open: string;
     eyes_closed: string;
+    /** Smiling closed eyes, shown once she has finished speaking. */
+    eyes_happy?: string;
     mouth: Record<Mouth, string>;
   };
 };

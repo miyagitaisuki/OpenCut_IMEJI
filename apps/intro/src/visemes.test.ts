@@ -46,3 +46,15 @@ test("mouthAt and duration", () => {
   expect(queryDuration(query)).toBeCloseTo(1.47);
   expect(queryDuration({ ...query, speedScale: 2 })).toBeCloseTo(0.735);
 });
+
+test("gestures switch at their times", async () => {
+  const { gestureAt } = await import("./Intro");
+  const list = [
+    { at: 2.5, gesture: "point" },
+    { at: 0, gesture: "explain" },
+  ];
+  expect(gestureAt(list, -1)).toBeUndefined();
+  expect(gestureAt(list, 1)).toBe("explain");
+  expect(gestureAt(list, 3)).toBe("point");
+  expect(gestureAt(undefined, 3)).toBeUndefined();
+});

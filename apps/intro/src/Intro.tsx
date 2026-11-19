@@ -17,7 +17,7 @@ import { mouthAt } from "./visemes";
 export const LEAD_IN = 0.8;
 export const TAIL = 1.2;
 
-export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, visemes }) => {
+export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds, visemes }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const seconds = frame / fps;
@@ -33,12 +33,19 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, visemes }) =
       <div
         style={{
           position: "absolute",
-          left: 120,
-          bottom: -40,
+          left: 0,
+          bottom: -60,
           transform: `translateY(${(1 - enter) * 400}px)`,
         }}
       >
-        <Avatar avatar={avatar} frame={frame} fps={fps} mouth={mouthAt(visemes, talking)} />
+        <Avatar
+          avatar={avatar}
+          frame={frame}
+          fps={fps}
+          mouth={mouthAt(visemes, talking)}
+          gesture={gestureAt(scene.gestures, talking)}
+          smiling={talking > voiceSeconds + 0.3}
+        />
       </div>
       <div
         style={{
@@ -84,32 +91,83 @@ const Avatar: React.FC<{
   frame: number;
   fps: number;
   mouth: keyof IntroProps["avatar"]["layers"]["mouth"];
-}> = ({ avatar, frame, fps, mouth }) => {
+  gesture?: string;
+  smiling: boolean;
+}> = ({ avatar, frame, fps, mouth, gesture, smiling }) => {
   const [w, h] = avatar.size;
-  const scale = 1000 / h;
+  const scale = 1040 / h;
   const base = `avatars/${avatar.folder}/`;
-  // Breathing bob and a little sway, so she never stands frozen.
-  const bob = Math.sin((frame / fps) * Math.PI * 0.9) * 8;
-  const sway = Math.sin((frame / fps) * Math.PI * 0.45) * 1.5;
-  const layer = (file: string) => (
-    <Img src={staticFile(base + file)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+  const layer = (file: string, style?: React.CSSProperties) => (
+    <Img
+      src={staticFile(base + file)}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", ...style }}
+    />
   );
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: w * scale,
-        height: h * scale,
-        transform: `translateY(${bob}px) rotate(${sway}deg)`,
-        transformOrigin: "50% 100%",
-      }}
-    >
-      {layer(avatar.layers.body)}
-      {layer(blinking(frame, fps) ? avatar.layers.eyes_closed : avatar.layers.eyes_open)}
+  const eyes =
+    smiling && avatar.layers.eyes_happy
+      ? avatar.layers.eyes_happy
+      : blinking(frame, fps)
+        ? avatar.layers.eyes_closed
+        : avatar.layers.eyes_open;
+  const face = (
+    <>
+      {layer(eyes)}
       {layer(avatar.layers.mouth[mouth])}
+    </>
+  );
+  const box: React.CSSProperties = { position: "relative", width: w * scale, height: h * scale };
+
+  const rig = avatar.rig;
+  if (!rig) {
+    // One still picture: breathe and sway the whole of it.
+    const bob = Math.sin((frame / fps) * Math.PI * 0.9) * 8;
+    const sway = Math.sin((frame / fps) * Math.PI * 0.45) * 1.5;
+    return (
+      <div style={{ ...box, transform: `translateY(${bob}px) rotate(${sway}deg)`, transformOrigin: "50% 100%" }}>
+        {avatar.layers.body && layer(avatar.layers.body)}
+        {face}
+      </div>
+    );
+  }
+
+  // Head tilt ±2.5°, back hair ±3.5° a few frames behind it, breathing ±2 px.
+  const headRotate = Math.sin(frame / 30) * 2.5;
+  const hairRotate = Math.sin((frame - 6) / 30) * 3.5;
+  const breatheY = Math.sin(frame / 25) * 2;
+  const arms = rig.arms[gesture ?? ""] ?? Object.values(rig.arms)[0];
+  const [nx, ny] = rig.neck;
+  return (
+    <div style={box}>
+      {rig.hair_back &&
+        layer(rig.hair_back, {
+          transform: `translateY(${breatheY}px) rotate(${hairRotate}deg)`,
+          transformOrigin: `${nx * 100}% ${ny * 100 - 10}%`,
+        })}
+      {layer(rig.torso, { transform: `translateY(${breatheY}px)` })}
+      {arms && layer(arms, { transform: `translateY(${breatheY * 1.2}px)` })}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: `translateY(${breatheY}px) rotate(${headRotate}deg)`,
+          transformOrigin: `${nx * 100}% ${ny * 100}%`,
+        }}
+      >
+        {layer(rig.head)}
+        {face}
+      </div>
     </div>
   );
 };
+
+/** The gesture at `seconds` of speech: the last one started by then. */
+export function gestureAt(gestures: { at: number; gesture: string }[] | undefined, seconds: number): string | undefined {
+  let current: string | undefined;
+  for (const g of [...(gestures ?? [])].sort((a, b) => a.at - b.at)) {
+    if (g.at <= seconds) current = g.gesture;
+  }
+  return current;
+}
 
 /** Blinks every 2.5–4 s for about 0.12 s, the same way on every render. */
 function blinking(frame: number, fps: number): boolean {
@@ -133,7 +191,7 @@ const Caption: React.FC<{ text: string; translation?: string; visible: boolean }
     style={{
       position: "absolute",
       // Right of the avatar, under the title card, so it never covers her.
-      left: 860,
+      left: 960,
       right: 80,
       bottom: 90,
       display: "flex",

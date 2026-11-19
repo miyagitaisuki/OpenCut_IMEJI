@@ -58,6 +58,18 @@ without a face), `eyes_open` / `eyes_closed`, and a mouth for each of
 `a i u e o n` (`n` is the closed mouth). Layers are PNG or SVG with a
 transparent background; each one is drawn where it sits on the face.
 
+A **rigged** avatar moves in parts, like a VTuber: `rig` in `avatar.json`
+names `hair_back` (sways a beat behind), `torso`, `head` (tilts about the
+`neck` point, eyes and mouth with it) and one `arms` picture per gesture.
+A scene picks gestures over time:
+
+```json
+"gestures": [{ "at": 0, "gesture": "explain" }, { "at": 2.6, "gesture": "point" }, { "at": 5.2, "gesture": "tip" }]
+```
+
+(`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
+is her smile once she has finished speaking.
+
 `demo` (original SVG art) is the only avatar in the repository. Avatars
 made from your own art, such as `sakura`, stay out of git by default
 (see `.gitignore`), since this repository is public.
