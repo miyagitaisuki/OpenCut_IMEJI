@@ -67,8 +67,8 @@ async function download({ url, sha256 }: Download, to: string) {
   await Bun.write(to, bytes);
 }
 
-function run(command: string[], cwd?: string) {
-  const result = Bun.spawnSync(command, { cwd, stdio: ["ignore", "inherit", "inherit"] });
+function run(command: string[], cwd?: string, env?: Record<string, string>) {
+  const result = Bun.spawnSync(command, { cwd, env: env && { ...process.env, ...env }, stdio: ["ignore", "inherit", "inherit"] });
   if (result.exitCode !== 0) throw new Error(`failed: ${command.join(" ")}`);
 }
 
@@ -85,7 +85,7 @@ function extract(archive: string, into: string) {
 
 const hasOpenH264 = (target: Platform) => keyOf(target) in manifest.openh264.binaries;
 
-type OpenH264 = { include: string; lib: string };
+type OpenH264 = { include: string; lib: string; pkgconfig: string };
 const openh264 = manifest.openh264 as {
   version: string;
   tag: string;
@@ -159,7 +159,22 @@ async function prepareOpenH264(staging: string, target: Platform): Promise<OpenH
     await fetchOpenH264Binary(target, lib, "libopenh264.so.8");
     symlinkSync("libopenh264.so.8", join(lib, "libopenh264.so"));
   }
-  return { include, lib };
+  // FFmpeg's configure finds libopenh264 only through pkg-config.
+  const pkgconfig = join(lib, "pkgconfig");
+  mkdirSync(pkgconfig, { recursive: true });
+  const dir = (path: string) => path.replaceAll("\\", "/");
+  writeFileSync(
+    join(pkgconfig, "openh264.pc"),
+    [
+      "Name: openh264",
+      "Description: OpenH264 (headers from source, library from Cisco's binary)",
+      `Version: ${openh264.version}`,
+      `Libs: -L${dir(lib)} -lopenh264`,
+      `Cflags: -I${dir(include)}`,
+      "",
+    ].join("\n"),
+  );
+  return { include, lib, pkgconfig };
 }
 
 /// Puts Cisco's binary where FFmpeg finds it at run time: beside the DLLs
@@ -249,7 +264,7 @@ async function buildFromSource(staging: string, target: Platform, flags: string[
     : [];
 
   console.log(`building FFmpeg ${manifest.version} for ${keyOf(target)}; this takes a few minutes`);
-  run(["./configure", `--prefix=${prefix}`, ...flags, ...openh264Flags], source);
+  run(["./configure", `--prefix=${prefix}`, ...flags, ...openh264Flags], source, linked && { PKG_CONFIG_PATH: linked.pkgconfig });
   run(["make", `-j${availableParallelism()}`], source);
   run(["make", "install"], source);
   // Example programs; nothing the libraries need.
