@@ -1,0 +1,17 @@
+[package]
+name = "opencut-media"
+description = "Media probing and decoding for OpenCut, on the pinned FFmpeg build"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# Not a native library of its own: `links` is how Cargo hands the FFmpeg
+# directory to the build scripts of crates that depend on this one
+# (DEP_OPENCUT_FFMPEG_LIB_DIR), so their binaries can find it at run time.
+links = "opencut_ffmpeg"
+build = "build.rs"
+
+[dependencies]
+ffmpeg-next = { version = "9.1", default-features = false, features = ["codec", "format", "software-scaling"] }
+png = "0.18"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"

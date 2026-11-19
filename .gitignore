@@ -8,3 +8,6 @@ docs/
 
 # moon runtime cache
 .moon/cache/
+
+# pinned FFmpeg builds (moon run media:setup)
+.cache/

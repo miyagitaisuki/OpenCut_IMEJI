@@ -1,0 +1,33 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'rust'
+layer: 'application'
+
+dependsOn: ['media']
+
+tasks:
+  mcp:
+    command: 'cargo run -p opencut-cli -- mcp'
+    deps: ['media:setup']
+    options:
+      runInCI: false
+
+  check:
+    command: 'cargo check -p opencut-cli'
+    deps: ['media:setup']
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.toml'
+      - '/Cargo.lock'
+
+  build:
+    command: 'cargo build -p opencut-cli --release'
+    deps: ['media:setup']
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.toml'
+      - '/Cargo.lock'
+    outputs:
+      - '/target/release/opencut'

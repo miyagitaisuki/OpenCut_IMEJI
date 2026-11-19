@@ -3,14 +3,18 @@ $schema: 'https://moonrepo.dev/schemas/project.json'
 language: 'rust'
 layer: 'application'
 
+dependsOn: ['media']
+
 tasks:
   dev:
     command: 'cargo run'
+    deps: ['media:setup']
     options:
       runInCI: false
 
   check:
     command: 'cargo check'
+    deps: ['media:setup']
     inputs:
       - 'src/**/*'
       - 'Cargo.toml'
@@ -19,6 +23,7 @@ tasks:
 
   build:
     command: 'cargo build --release'
+    deps: ['media:setup']
     inputs:
       - 'src/**/*'
       - 'Cargo.toml'

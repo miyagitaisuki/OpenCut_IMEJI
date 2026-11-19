@@ -10,4 +10,8 @@ name = "opencut-desktop"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1"
 gpui = { workspace = true }
+# The version GPUI uses, for building `RenderImage`s from decoded frames.
+image = { version = "0.25", default-features = false }
+opencut-media = { workspace = true }

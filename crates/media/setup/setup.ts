@@ -20,6 +20,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -191,6 +192,26 @@ async function installPrebuilt(prebuilt: Download, staging: string): Promise<str
   return join(staging, readdirSync(staging)[0]);
 }
 
+/// Source build flags, or `undefined` where this machine cannot build the
+/// target from source (e.g. Windows, which cross-compiles from Linux).
+function sourceFlagsIfBuildable(target: Platform, host: Platform): string[] | undefined {
+  try {
+    return configureFlags(target, host);
+  } catch {
+    return undefined;
+  }
+}
+
+/// Points `.cache/media/current` at the host's build: `.cargo/config.toml`
+/// hands that path to ffmpeg-sys-next as FFMPEG_DIR. A junction on Windows,
+/// which needs no admin rights. Builds for other platforms are left unlinked.
+function linkCurrent(destination: string, target: Platform, host: Platform) {
+  if (keyOf(target) !== keyOf(host)) return;
+  const current = join(cache, "current");
+  rmSync(current, { recursive: true, force: true });
+  symlinkSync(destination, current, process.platform === "win32" ? "junction" : "dir");
+}
+
 async function main() {
   const host = hostPlatform();
   const target = option("--target") ? parsePlatform(option("--target")!) : host;
@@ -206,7 +227,14 @@ async function main() {
 
   const destination = join(cache, `ffmpeg-${manifest.version}-${key}`);
   const marker = join(destination, ".complete");
-  if (existsSync(marker) && (await Bun.file(marker).text()).trim() === stamp) {
+  // A source build of the same pin also satisfies a request for the
+  // prebuilt: it is what the prebuilt is made from (and what a failed
+  // prebuilt download falls back to).
+  const sourceFlags = fromSource ? flags : sourceFlagsIfBuildable(target, host);
+  const sourceStamp = sourceFlags && `source ${manifest.source.sha256} ${createHash("sha256").update(sourceFlags.join(" ")).digest("hex")}`;
+  const accepted = sourceStamp ? [stamp, sourceStamp] : [stamp];
+  if (existsSync(marker) && accepted.includes((await Bun.file(marker).text()).trim())) {
+    linkCurrent(destination, target, host);
     console.log(`FFmpeg ${manifest.version} for ${key} is ready in ${destination}`);
     return;
   }
@@ -216,14 +244,30 @@ async function main() {
   const staging = `${destination}.partial`;
   rmSync(staging, { recursive: true, force: true });
   mkdirSync(staging, { recursive: true });
-  const built = fromSource
-    ? await buildFromSource(staging, target, flags)
-    : await installPrebuilt(prebuilt!, staging);
+  let built: string;
+  let builtStamp = stamp;
+  if (fromSource) {
+    built = await buildFromSource(staging, target, flags);
+  } else {
+    try {
+      built = await installPrebuilt(prebuilt!, staging);
+    } catch (error) {
+      // Prebuilt hosts prune old builds; the pinned source still builds
+      // wherever this machine can build it.
+      if (!sourceFlags || !sourceStamp) throw error;
+      console.warn(`${error instanceof Error ? error.message : error}\nfalling back to building from source`);
+      rmSync(staging, { recursive: true, force: true });
+      mkdirSync(staging, { recursive: true });
+      built = await buildFromSource(staging, target, sourceFlags);
+      builtStamp = sourceStamp;
+    }
+  }
 
   rmSync(destination, { recursive: true, force: true });
   renameSync(built, destination);
   rmSync(staging, { recursive: true, force: true });
-  writeFileSync(marker, `${stamp}\n`);
+  writeFileSync(marker, `${builtStamp}\n`);
+  linkCurrent(destination, target, host);
   console.log(`FFmpeg ${manifest.version} for ${key} is ready in ${destination}`);
 }
 
