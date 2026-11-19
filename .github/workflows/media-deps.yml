@@ -81,7 +81,7 @@ jobs:
         shell: bash
         run: |
           log="$(ls .cache/media/*.partial/*/ffbuild/config.log 2>/dev/null | head -1)"
-          [ -n "$log" ] && grep -n -B2 -A25 -i 'openh264' "$log" | tail -80 || echo "no config.log"
+          [ -n "$log" ] && grep -n -B2 -A25 -i 'openh264' "$log" | tail -15 || echo "no config.log"
 
       - name: Check H.264 encoding is linked in
         if: startsWith(matrix.platform, 'linux-')

@@ -148,10 +148,17 @@ async function prepareOpenH264(staging: string, target: Platform): Promise<OpenH
     const arch = target.arch === "x86_64" ? "win64" : "win-arm64";
     const dll = `openh264-${openh264.version}-${arch}.dll`;
     mkdirSync(lib, { recursive: true });
-    // The exports FFmpeg's libopenh264 wrapper uses.
+    // The exports FFmpeg's libopenh264 wrappers (encoder and decoder) use.
     writeFileSync(
       join(lib, "openh264.def"),
-      [`LIBRARY ${dll}`, "EXPORTS", ...["WelsCreateSVCEncoder", "WelsDestroySVCEncoder", "WelsGetCodecVersion", "WelsGetCodecVersionEx"].map((n) => `    ${n}`), ""].join("\n"),
+      [`LIBRARY ${dll}`, "EXPORTS", ...[
+          "WelsCreateSVCEncoder",
+          "WelsDestroySVCEncoder",
+          "WelsCreateDecoder",
+          "WelsDestroyDecoder",
+          "WelsGetCodecVersion",
+          "WelsGetCodecVersionEx",
+        ].map((n) => `    ${n}`), ""].join("\n"),
     );
     const machine = target.arch === "x86_64" ? "i386:x86-64" : "arm64";
     run([`${target.arch}-w64-mingw32-dlltool`, "-d", join(lib, "openh264.def"), "-l", join(lib, "libopenh264.dll.a"), "-m", machine]);
