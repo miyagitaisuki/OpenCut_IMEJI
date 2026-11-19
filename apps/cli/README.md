@@ -36,6 +36,11 @@ opencut render lesson/bai10.project.json        # lesson/bai10.mp4 (+ .vtt .srt 
 - **Translations** after ` // ` in the script (or `translation` in a textts project) go under
   each line: Japanese on top, the translation on the next line (class `tr` in the `.vtt`,
   the second line in the `.srt`).
+- **Burned-in subtitles** for YouTube (which shows neither ruby nor a styled second line from a
+  `.vtt`): `opencut render lesson/bai10.project.json --burn-subtitles -o bai10.youtube.mp4` draws
+  each cue into the picture, furigana above the kanji and the translation underneath. Fonts come
+  from the system (Yu Gothic or Meiryo on Windows, Noto Sans CJK on Linux); `--font file.ttc`
+  picks one, repeat it for fallbacks.
 - **Slides** are spread one per scene (`[bgm=…]` in the script), one per line, or evenly.
 - **Loudness**: the whole mix is brought to `loudness_lufs` in the project (-16 LUFS by
   default, `--loudness` to change it), never above -1 dBTP. The render report says what it measured.

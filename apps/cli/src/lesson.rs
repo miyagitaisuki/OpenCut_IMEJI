@@ -148,10 +148,17 @@ pub(crate) fn parse_codec(name: Option<&str>) -> Result<VideoCodec> {
 }
 
 /// Renders `project` to `output`, by default `<project name>.mp4` beside it.
+/// How to render, as the command line and MCP take it.
+pub(crate) struct RenderChoices {
+    pub codec: VideoCodec,
+    pub burn_subtitles: bool,
+    pub fonts: Vec<PathBuf>,
+}
+
 pub(crate) fn render_project(
     project: &Path,
     output: Option<&Path>,
-    codec: VideoCodec,
+    choices: RenderChoices,
     progress: impl FnMut(f64),
 ) -> Result<RenderReport> {
     let loaded = Project::load(project)?;
@@ -162,7 +169,9 @@ pub(crate) fn render_project(
         std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     }
     let options = RenderOptions {
-        codec,
+        codec: choices.codec,
+        burn_subtitles: choices.burn_subtitles,
+        fonts: choices.fonts,
         ..RenderOptions::default()
     };
     Ok(render(

@@ -97,6 +97,14 @@ enum Command {
         /// auto (H.264 when available), h264 or mpeg4.
         #[arg(long, default_value = "auto")]
         codec: String,
+        /// Draw the subtitles into the picture, furigana and translation
+        /// included (for YouTube, which shows neither from a .vtt).
+        #[arg(long)]
+        burn_subtitles: bool,
+        /// Font for burned-in subtitles; repeat to add fallbacks. Defaults
+        /// to the system's Japanese fonts (Yu Gothic, Meiryo, Noto Sans CJK).
+        #[arg(long = "font")]
+        fonts: Vec<PathBuf>,
     },
     /// Serve the editor's tools to AI agents over MCP (stdio).
     Mcp,
@@ -181,9 +189,15 @@ fn main() -> Result<()> {
             project,
             output,
             codec,
+            burn_subtitles,
+            fonts,
         } => {
-            let codec = lesson::parse_codec(Some(&codec))?;
-            let report = lesson::render_project(&project, output.as_deref(), codec, |done| {
+            let choices = lesson::RenderChoices {
+                codec: lesson::parse_codec(Some(&codec))?,
+                burn_subtitles,
+                fonts,
+            };
+            let report = lesson::render_project(&project, output.as_deref(), choices, |done| {
                 eprint!("\rrendering {:>3.0}%", done * 100.0);
             })?;
             eprintln!();

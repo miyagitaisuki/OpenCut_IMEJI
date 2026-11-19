@@ -72,6 +72,11 @@ struct RenderParams {
     output: Option<PathBuf>,
     /// auto (H.264 when this FFmpeg has it, else MPEG-4), h264 or mpeg4.
     codec: Option<String>,
+    /// Draw the subtitles (furigana and translation included) into the
+    /// picture, for YouTube and other players without ruby. Default false.
+    burn_subtitles: Option<bool>,
+    /// Font files for burned-in subtitles; the system's Japanese fonts by default.
+    fonts: Option<Vec<PathBuf>>,
 }
 
 #[derive(Clone)]
@@ -152,7 +157,7 @@ impl OpenCut {
     }
 
     #[tool(
-        description = "Render a project.json to a video (MP4 by default), and write .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
+        description = "Render a project.json to a video (MP4 by default); burn_subtitles draws the subtitles with furigana and translation into the picture (for YouTube). Writes .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
     )]
     async fn render_project(
         &self,
@@ -160,11 +165,15 @@ impl OpenCut {
     ) -> Result<CallToolResult, ErrorData> {
         respond(json(
             blocking(move || {
-                let codec = crate::lesson::parse_codec(params.codec.as_deref()).map_err(chain)?;
+                let choices = crate::lesson::RenderChoices {
+                    codec: crate::lesson::parse_codec(params.codec.as_deref()).map_err(chain)?,
+                    burn_subtitles: params.burn_subtitles.unwrap_or(false),
+                    fonts: params.fonts.unwrap_or_default(),
+                };
                 crate::lesson::render_project(
                     &params.project,
                     params.output.as_deref(),
-                    codec,
+                    choices,
                     |_| {},
                 )
                 .map_err(chain)

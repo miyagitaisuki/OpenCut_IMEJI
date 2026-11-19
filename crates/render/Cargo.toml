@@ -6,6 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# Burned-in subtitles: glyphs from the system's Japanese fonts.
+ab_glyph = "0.2"
 # EBU R128 loudness, to bring every lesson to the same level.
 ebur128 = "0.1"
 # Slides: the LGPL FFmpeg build has no zlib, so no PNG decoder.

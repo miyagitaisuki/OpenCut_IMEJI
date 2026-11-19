@@ -6,6 +6,8 @@
 //! learners can turn them off) and `<name>.markers.json` (scenes,
 //! chapters and the questions to stop on).
 
+mod caption;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -35,6 +37,8 @@ pub enum Error {
         path: PathBuf,
         source: opencut_media::Error,
     },
+    #[error("{0}")]
+    Font(String),
     #[error("{path}: {message}")]
     Image { path: PathBuf, message: String },
     #[error("{path}: {source}")]
@@ -53,6 +57,12 @@ pub struct RenderOptions {
     pub bit_rate: Option<usize>,
     /// Write `.vtt`, `.srt` and `.markers.json` beside the video.
     pub sidecars: bool,
+    /// Draw the subtitles into the picture (furigana and translation
+    /// included), for players that show no soft subtitles or no ruby.
+    pub burn_subtitles: bool,
+    /// Fonts for burned-in subtitles, tried in order for each character;
+    /// the system's Japanese fonts when empty.
+    pub fonts: Vec<PathBuf>,
 }
 
 impl Default for RenderOptions {
@@ -61,6 +71,8 @@ impl Default for RenderOptions {
             codec: VideoCodec::Auto,
             bit_rate: None,
             sidecars: true,
+            burn_subtitles: false,
+            fonts: Vec::new(),
         }
     }
 }
@@ -169,6 +181,15 @@ pub fn render(
         source,
     };
 
+    let fonts = if options.burn_subtitles {
+        Some(caption::Fonts::load(&options.fonts).map_err(Error::Font)?)
+    } else {
+        None
+    };
+    // Each cue is laid out once, the first time it shows.
+    let mut captions: HashMap<usize, Option<Frame>> = HashMap::new();
+    let bottom_margin = (f64::from(height) * 0.06) as i64;
+
     for index in 0..frames {
         let time = index as f64 / f64::from(fps);
         fill(&mut picture.data, background);
@@ -177,6 +198,21 @@ pub fn render(
                 layers.draw(layer, visual, time, &mut picture)?;
             } else if time >= visual.end {
                 layers.release(layer);
+            }
+        }
+        if let Some(fonts) = &fonts
+            && let Some(cue_index) = project
+                .subtitles
+                .iter()
+                .position(|c| time >= c.start && time < c.end)
+        {
+            let drawn = captions.entry(cue_index).or_insert_with(|| {
+                caption::render_cue(&project.subtitles[cue_index], fonts, width, height)
+            });
+            if let Some(drawn) = drawn {
+                let x = (i64::from(width) - i64::from(drawn.width)) / 2;
+                let y = i64::from(height) - i64::from(drawn.height) - bottom_margin;
+                blit(&mut picture, drawn, x, y);
             }
         }
         picture.seconds = time;
