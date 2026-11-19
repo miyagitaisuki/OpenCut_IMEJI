@@ -30,4 +30,5 @@ tasks:
       - '/Cargo.toml'
       - '/Cargo.lock'
     outputs:
-      - '/target/release/opencut-desktop'
+      # opencut-desktop on Linux and macOS, opencut-desktop.exe on Windows (a glob, so either counts).
+      - '/target/release/opencut-desktop*'
