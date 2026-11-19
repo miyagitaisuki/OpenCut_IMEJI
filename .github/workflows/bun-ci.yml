@@ -36,5 +36,10 @@ jobs:
           auto-install: true
           auto-setup: true
 
+      # GPUI (the desktop app) links against these on Linux; see apps/desktop/README.md.
+      - name: Install desktop build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libfontconfig-dev
+
       - name: Run CI
         run: moon ci
