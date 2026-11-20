@@ -104,6 +104,10 @@ bun run lesson build  x.visuals.json x.project.json --captions
 
 Without `x.words.json`, `--captions` spreads each cue's time over its text (kana by mora, kanji by reading, pauses at 、。). With it, Whisper's tokens give the real pace; only how far through the sentence it was counts, so Whisper mishearing the words does no harm. With `opencut_ptc.py lesson --visuals ... --karaoke` this is automatic and `--burn-subtitles` is skipped (the intro/outro lines are then not burned in). Set `WHISPER_DIR` to keep Whisper elsewhere.
 
+### Accent stickers (Lottie)
+
+Any authored scene may carry `"accent": "check" | "cross" | "star"` (and `"accent_at": 0.8`, seconds into the scene): a small animated sticker pops once in the top-right corner, for right/wrong answers and praise. They are plain Lottie files in `public/lottie/`, written by `scripts/make_lottie.py` (re-run it to change colours); drop in any other Lottie JSON and add its name to `accent`'s type to use it.
+
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one

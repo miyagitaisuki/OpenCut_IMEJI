@@ -1,5 +1,6 @@
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 
+import { Accent } from "./Accent";
 import { C, FIRST, FONT, Jp, Pop, SAFE, SHADOW, STAGGER, SceneFrame, TONES, useReveal } from "./theme";
 import type { ChartScene, CompareScene, DialogueScene, GrammarScene, KeywordScene, LessonScene, TitleScene } from "./types";
 
@@ -367,7 +368,7 @@ export const Keyword: React.FC<P<KeywordScene>> = ({ scene, duration }) => (
   </SceneFrame>
 );
 
-export const SceneView: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, duration }) => {
+const Body: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, duration }) => {
   switch (scene.template) {
     case "title":
       return <Title scene={scene} duration={duration} />;
@@ -383,3 +384,11 @@ export const SceneView: React.FC<{ scene: LessonScene; duration: number }> = ({ 
       return <Keyword scene={scene} duration={duration} />;
   }
 };
+
+/** A scene, with its accent sticker over it when the scene asks for one. */
+export const SceneView: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, duration }) => (
+  <>
+    <Body scene={scene} duration={duration} />
+    {"accent" in scene && scene.accent ? <Accent kind={scene.accent} at={scene.accent_at ?? 0.8} /> : null}
+  </>
+);
