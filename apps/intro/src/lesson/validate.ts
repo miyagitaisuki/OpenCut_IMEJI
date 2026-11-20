@@ -2,7 +2,7 @@
 
 import { existsSync } from "node:fs";
 
-const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image", "practice"];
+const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image", "practice", "examples"];
 const TONES = ["pink", "navy", "mint", "sun", "sky"];
 const ACCENTS = ["check", "cross", "star"];
 
@@ -89,6 +89,15 @@ export function validate(data: unknown, cueCount: number, pictureExists: (src: s
           if ((raw.lines as unknown[]).length > 5) warnings.push(`${here}: more than 5 lines is crowded`);
         }
         if (raw.layout !== undefined && raw.layout !== "bubbles" && raw.layout !== "timeline") errors.push(`${here}: layout must be "bubbles" or "timeline"`);
+        break;
+      case "examples":
+        if (!list(raw.items) || (raw.items as unknown[]).length > 4) errors.push(`${here}: items needs 1 to 4 examples`);
+        else
+          (raw.items as unknown[]).forEach((it, i) => {
+            if (!isObj(it) || !str(it.text)) return errors.push(`${here}: items[${i}].text is required`);
+            if (it.cue !== undefined && (!Number.isInteger(it.cue) || (it.cue as number) < (cue as number))) errors.push(`${here}: items[${i}].cue must be an integer >= the scene's cue`);
+            if (it.picture !== undefined && (!str(it.picture) || !pictureExists(it.picture as string))) warnings.push(`${here}: items[${i}] picture missing (${it.picture}): the card shows without it`);
+          });
         break;
       case "practice":
         if (!str(raw.question)) errors.push(`${here}: question is required`);

@@ -7,6 +7,7 @@ description: Dùng khi người dùng nhờ soạn một video bài giảng ti�
 
 Đầu ra trong `lessons/<ten>/` (đã gitignore):
 - `<ten>.script.vi.txt`: kịch bản textts, mỗi câu một dòng `[vai] câu tiếng Nhật // bản dịch Việt`.
+- `<ten>.pictures.md`: danh sách hình cần tạo (tên file + prompt tiếng Anh, chung một khối "Phong cách chung"), để người dùng tạo bằng Gemini (Google AI Pro) rồi đặt vào `lessons/<ten>/images/`. Mẫu: `apps/intro/scenes/minna-05.pictures.md`.
 - `<ten>.visuals.json`: cảnh minh họa, `cue` = số thứ tự dòng nói (0 = dòng nói đầu tiên; dòng `[pause=...]` và dòng `#` không tính).
 
 Sau đó **dừng lại** để người dùng duyệt. Không gọi textts và không render khi chưa được duyệt.
@@ -17,7 +18,7 @@ Hỏi số bài Minna (hoặc chủ đề), cấp độ (mặc định N5 với 
 ## 2. Cấu trúc bài (theo thứ tự)
 1. **Mở bài** (2–3 câu): chào, giới thiệu chủ đề bài. Cảnh `title` (badge `N5`/`N4`).
 2. **Từ vựng chính** (5–8 từ): mỗi từ một câu có ví dụ ngắn. Dùng cảnh `compare` hoặc `image`, hoặc để cảnh từ khóa mặc định.
-3. **Ngữ pháp**: mỗi mẫu câu gồm 1 câu giới thiệu, cảnh `grammar` (các phần + kết quả), 2–3 câu ví dụ. Dùng `compare` khi so hai mẫu dễ nhầm.
+3. **Ngữ pháp**: mỗi mẫu câu gồm câu giới thiệu + ví von (cảnh `grammar`), rồi **ít nhất 3 câu ví dụ, mỗi câu một dòng** (cảnh `examples`: mỗi thẻ có hình `images/<ten-hinh>.png` + câu Nhật + dịch Việt, thẻ hiện lên đúng lúc câu đó được đọc; mỗi hình một dòng trong `pictures.md`). Dùng `compare` khi so hai mẫu dễ nhầm.
 4. **Hội thoại mẫu** (6–10 câu, 2 vai): cảnh `dialogue` (bubbles).
 5. **Luyện tập** (3–5 câu hỏi): mỗi câu hỏi gồm 1 dòng đọc câu hỏi, 1 dòng `[pause=5000]`, 1 dòng đọc đáp án và lý do. Cảnh `practice` (`think` 5 s) đặt ở dòng đọc câu hỏi, `until_cue` đến hết dòng đáp án.
 6. **Tổng kết + nhắc làm bài QBank** (2–3 câu). Cảnh `title` hoặc `grammar` tóm tắt, kèm `accent: "star"`.

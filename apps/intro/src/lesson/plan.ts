@@ -62,13 +62,18 @@ export function planScenes(cues: Cue[], scenes: AuthoredScene[], bodyStart: numb
       start: cues[c].start - bodyStart,
       end: 0,
       cues: [c, end],
+      beats: cues.slice(c, end + 1).map((q) => q.start),
       scene: who !== undefined ? sorted[who] : defaultScene(cues[c]),
     });
     c = end + 1;
   }
   segments[0].start = 0;
   const round = (n: number) => Math.round(n * 1000) / 1000;
-  for (const s of segments) s.start = round(Math.max(0, s.start));
+  for (const s of segments) {
+    const first = s.beats?.[0] ?? 0;
+    s.beats = s.beats?.map((b) => round(Math.max(0, b - first)));
+    s.start = round(Math.max(0, s.start));
+  }
   segments.forEach((s, i) => {
     s.end = i + 1 < segments.length ? segments[i + 1].start : round(duration);
   });

@@ -33,7 +33,7 @@
     {
       "template": "grammar",
       "cue": 8,
-      "until_cue": 11,
+      "until_cue": 9,
       "title": "「へ」 = mũi tên chỉ hướng",
       "parts": [
         {
@@ -50,15 +50,35 @@
           "tone": "navy"
         }
       ],
-      "result": {
-        "text": "図書館{としょかん}へ行{い}きます"
-      },
       "note": "へ chỉ hướng mình đi tới"
     },
     {
+      "template": "examples",
+      "cue": 10,
+      "until_cue": 12,
+      "title": "Ví dụ với へ",
+      "items": [
+        {
+          "text": "図書館{としょかん}へ行{い}きます。",
+          "translation": "Tôi đi đến thư viện.",
+          "picture": "images/library.png"
+        },
+        {
+          "text": "来週{らいしゅう}、大阪{おおさか}へ行{い}きます。",
+          "translation": "Tuần sau tôi đi Osaka.",
+          "picture": "images/osaka.png"
+        },
+        {
+          "text": "七時{しちじ}に家{いえ}へ帰{かえ}ります。",
+          "translation": "Tôi về nhà lúc 7 giờ.",
+          "picture": "images/home.png"
+        }
+      ]
+    },
+    {
       "template": "grammar",
-      "cue": 12,
-      "until_cue": 15,
+      "cue": 13,
+      "until_cue": 14,
       "title": "「で」 = chiếc xe chở bạn",
       "parts": [
         {
@@ -75,15 +95,36 @@
           "tone": "navy"
         }
       ],
-      "result": {
-        "text": "電車{でんしゃ}で行{い}きます"
-      },
-      "note": "Đi bộ thì nói 歩{ある}いて, không dùng で"
+      "note": "で chở bạn đến nơi"
+    },
+    {
+      "template": "examples",
+      "cue": 15,
+      "until_cue": 18,
+      "title": "Ví dụ với で",
+      "items": [
+        {
+          "text": "電車{でんしゃ}で会社{かいしゃ}へ行{い}きます。",
+          "translation": "Tôi đi làm bằng tàu điện.",
+          "picture": "images/train.png"
+        },
+        {
+          "text": "自転車{じてんしゃ}で学校{がっこう}へ行{い}きます。",
+          "translation": "Tôi đi học bằng xe đạp.",
+          "picture": "images/bicycle.png"
+        },
+        {
+          "text": "飛行機{ひこうき}で日本{にほん}へ来{き}ました。",
+          "translation": "Tôi đã đến Nhật bằng máy bay.",
+          "picture": "images/airplane.png"
+        }
+      ],
+      "note": "Đi bộ: 歩{ある}いて行{い}きます (không dùng で)"
     },
     {
       "template": "grammar",
-      "cue": 16,
-      "until_cue": 19,
+      "cue": 19,
+      "until_cue": 20,
       "title": "「と」 = nắm tay đi cùng",
       "parts": [
         {
@@ -100,15 +141,36 @@
           "tone": "navy"
         }
       ],
-      "result": {
-        "text": "友達{ともだち}と行{い}きます"
-      },
+      "note": "と là người đi cùng mình"
+    },
+    {
+      "template": "examples",
+      "cue": 21,
+      "until_cue": 24,
+      "title": "Ví dụ với と",
+      "items": [
+        {
+          "text": "友達{ともだち}と映画館{えいがかん}へ行{い}きます。",
+          "translation": "Tôi đi rạp phim với bạn.",
+          "picture": "images/cinema.png"
+        },
+        {
+          "text": "家族{かぞく}と日本{にほん}へ来{き}ました。",
+          "translation": "Tôi đã đến Nhật cùng gia đình.",
+          "picture": "images/family.png"
+        },
+        {
+          "text": "先生{せんせい}と図書館{としょかん}へ行{い}きます。",
+          "translation": "Tôi đi thư viện cùng thầy cô.",
+          "picture": "images/teacher.png"
+        }
+      ],
       "note": "Đi một mình: 一人{ひとり}で (không có と)"
     },
     {
       "template": "grammar",
-      "cue": 20,
-      "until_cue": 21,
+      "cue": 25,
+      "until_cue": 26,
       "title": "Ghép cả ba",
       "parts": [
         {
@@ -135,8 +197,8 @@
     },
     {
       "template": "dialogue",
-      "cue": 22,
-      "until_cue": 26,
+      "cue": 27,
+      "until_cue": 31,
       "title": "Hội thoại",
       "layout": "bubbles",
       "lines": [
@@ -164,8 +226,8 @@
     },
     {
       "template": "dialogue",
-      "cue": 27,
-      "until_cue": 28,
+      "cue": 32,
+      "until_cue": 33,
       "title": "Hội thoại",
       "layout": "bubbles",
       "lines": [
@@ -183,8 +245,8 @@
     },
     {
       "template": "practice",
-      "cue": 30,
-      "until_cue": 31,
+      "cue": 35,
+      "until_cue": 36,
       "title": "Luyện tập 1",
       "question": "バス＿＿学校{がっこう}へ行{い}きます。",
       "options": [
@@ -198,8 +260,8 @@
     },
     {
       "template": "practice",
-      "cue": 32,
-      "until_cue": 33,
+      "cue": 37,
+      "until_cue": 38,
       "title": "Luyện tập 2",
       "question": "母{はは}＿＿デパートへ行{い}きます。",
       "options": [
@@ -213,8 +275,8 @@
     },
     {
       "template": "practice",
-      "cue": 34,
-      "until_cue": 35,
+      "cue": 39,
+      "until_cue": 40,
       "title": "Luyện tập 3",
       "question": "来年{らいねん}、日本{にほん}＿＿行{い}きます。",
       "options": [
@@ -228,8 +290,8 @@
     },
     {
       "template": "dialogue",
-      "cue": 36,
-      "until_cue": 37,
+      "cue": 41,
+      "until_cue": 42,
       "title": "Tổng kết",
       "layout": "timeline",
       "lines": [

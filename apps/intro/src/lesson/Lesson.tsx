@@ -49,7 +49,7 @@ export const Lesson: React.FC<LessonProps> = ({ segments, captions }) => {
           const items = [
             <TransitionSeries.Sequence key={`s${i}`} durationInFrames={own + overlap} premountFor={fps}>
               {/* A huge duration: the transition does the leaving, the scene's own fade-out stays out of the way. */}
-              <SceneView scene={s.scene} duration={1e6} />
+              <SceneView scene={s.scene} duration={1e6} beats={s.beats} />
             </TransitionSeries.Sequence>,
           ];
           if (!last && overlap > 0) {

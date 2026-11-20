@@ -138,6 +138,22 @@ function words(projectPath: string): string {
 export function stageImages(visuals: VisualsFile, visualsPath: string): void {
   const publicDir = join(root, "public");
   for (const scene of visuals.scenes ?? []) {
+    if (scene.template === "examples") {
+      for (const it of scene.items) {
+        if (!it.picture || existsSync(join(publicDir, it.picture))) continue;
+        const file = resolve(dirname(resolve(visualsPath)), it.picture);
+        if (!existsSync(file)) {
+          console.error(`warning: scene at cue ${scene.cue}: picture not found, card shown without it: ${it.picture}`);
+          it.picture = undefined;
+          continue;
+        }
+        const name = `${createHash("sha1").update(file).digest("hex").slice(0, 8)}-${basename(file)}`;
+        mkdirSync(join(publicDir, "_lesson"), { recursive: true });
+        copyFileSync(file, join(publicDir, "_lesson", name));
+        it.picture = `_lesson/${name}`;
+      }
+      continue;
+    }
     if (scene.template !== "image") continue;
     for (const im of scene.images) {
       if (/^https?:\/\//.test(im.src) || existsSync(join(publicDir, im.src))) continue;
