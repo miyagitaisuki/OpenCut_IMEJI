@@ -250,11 +250,11 @@
       "title": "Luyện tập 1",
       "question": "バス＿＿学校{がっこう}へ行{い}きます。",
       "options": [
-        "で",
         "へ",
+        "で",
         "と"
       ],
-      "answer": 0,
+      "answer": 1,
       "think": 5,
       "explain": "Xe buýt là phương tiện → で"
     },
@@ -265,11 +265,11 @@
       "title": "Luyện tập 2",
       "question": "母{はは}＿＿デパートへ行{い}きます。",
       "options": [
-        "へ",
         "と",
+        "へ",
         "で"
       ],
-      "answer": 1,
+      "answer": 0,
       "think": 5,
       "explain": "Đi cùng mẹ → と"
     },
