@@ -467,7 +467,19 @@ def make_lesson(args: argparse.Namespace) -> dict:
     raise AssertionError("unreachable")
 
 
-def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
+def _resolve_scenes_arg(args: argparse.Namespace) -> None:
+    """With --script and no --visuals: use the scenes file next to the script when there is one."""
+    if args.script and not args.visuals:
+        from_script = Path(args.script).resolve()
+        base = re.sub(r"\.script(\.vi)?\.txt$|\.txt$", "", from_script.name)
+        sibling = from_script.with_name(f"{base}.visuals.json")
+        if sibling.exists():
+            args.visuals = str(sibling)
+
+
+def stage_tts(args: argparse.Namespace, out: Path, name: str) -> dict:
+    """Stage `tts`: the script (QBank questions, or a lesson file) voiced by textts, with the listen-back QC.
+    Returns what the later stages need; the caller keeps it in <name>.tts.json."""
     chapters: list[tuple[str, int]] = []
     from_script = Path(args.script).resolve() if args.script else None
     if from_script:
@@ -483,18 +495,10 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
     if not questions and not from_script:
         raise PtcError("no listening questions found")
 
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    name = args.name or out.name
     warnings: list[str] = []
+    starts: list[int] = []
     if from_script:
         script, script_tr, chapters = parse_lesson_script(from_script)
-        starts: list[int] = []
-        base = re.sub(r"\.script(\.vi)?\.txt$|\.txt$", "", from_script.name)
-        if not args.visuals:
-            sibling = from_script.with_name(f"{base}.visuals.json")
-            if sibling.exists():
-                args.visuals = str(sibling)
         if args.visuals and args.visuals != "auto":
             # Before any voice is made: scenes that do not fit the script are found here, not after a render.
             warnings = check_scenes(args.visuals, from_script)
@@ -518,10 +522,20 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
     result, voice_qc = voice_with_qc(script, roles, args, args.title or name, name)
     qc["voice"] = voice_qc
     audio, srt, timeline = textts_outputs(result, out / "textts")
+    return {"dry_run": False, "name": name, "title": args.title or name, "questions": questions,
+            "starts": starts, "chapters": [list(c) for c in chapters], "translated": str(translated_path),
+            "audio": str(audio), "srt": str(srt), "timeline": str(timeline),
+            "duration_s": result.get("duration_s"), "warnings": warnings, "qc": qc}
+
+
+def stage_scenes(args: argparse.Namespace, out: Path, name: str, state: dict) -> dict:
+    """Stage `scenes`: import the voice into a project, draw the scenes, the mascot and the markers, then the
+    engine check. With --visuals auto the scenes Claude wrote are kept when the cue count has not changed,
+    so editing a line does not call Claude again. Sets state: project, markers, retry (engine taught readings)."""
     opencut = find_opencut()
     project = out / f"{name}.project.json"
-    cmd = [opencut, "import-textts", str(audio), "--srt", str(srt), "--timeline", str(timeline),
-           "--script", str(translated_path), "--title", args.title or name, "-o", str(project)]
+    cmd = [opencut, "import-textts", state["audio"], "--srt", state["srt"], "--timeline", state["timeline"],
+           "--script", state["translated"], "--title", state["title"], "-o", str(project)]
     for flag, value in (("--intro", args.intro), ("--outro", args.outro)):
         if value:
             cmd += [flag, value]
@@ -529,18 +543,24 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
         cmd += ["--slide", slide]
     run(cmd)
 
+    qc = state["qc"]
     if args.visuals:
         # The body picture: Remotion scenes timed by the project's cues. Before the mascot,
         # which is drawn over it.
         visuals = args.visuals
         if visuals == "auto":
-            # Claude writes the scenes from the project's cues; look them over (and edit) before the next render.
-            import opencut_scenes
-            try:
-                visuals = str(opencut_scenes.generate(project, out / f"{name}.visuals.json"))
-            except opencut_scenes.ScenesError as error:
-                raise PtcError(f"auto scenes failed: {error}") from error
-            args.visuals = visuals  # a rebuild after an engine fix reuses these scenes, not new ones
+            sibling = out / f"{name}.visuals.json"
+            cues_now = len(json.loads(project.read_text(encoding="utf-8")).get("subtitles", []))
+            if sibling.exists() and state.get("visuals_cues") == cues_now:
+                visuals = str(sibling)  # same cue layout: the scenes already written are kept
+            else:
+                import opencut_scenes
+                try:
+                    visuals = str(opencut_scenes.generate(project, sibling))
+                except opencut_scenes.ScenesError as error:
+                    raise PtcError(f"auto scenes failed: {error}") from error
+                state["visuals_cues"] = cues_now
+            args.visuals = visuals  # a later pass of this lesson reuses these scenes, not new ones
         apply_visuals(project, visuals, karaoke=args.karaoke)
 
     if args.mascot:
@@ -548,22 +568,29 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
         run([opencut, "mascot", str(project), "--avatar", args.mascot])
 
     # Cue times already include any intro, so markers follow the project.
-    markers = add_question_markers(project, questions, starts) if questions else 0
-    if chapters:
-        markers += add_chapter_markers(project, chapters)
+    markers = add_question_markers(project, state["questions"], state["starts"]) if state["questions"] else 0
+    if state["chapters"]:
+        markers += add_chapter_markers(project, [tuple(c) for c in state["chapters"]])
 
     # Engine check: AivisSpeech's own reading of each line against the furigana. Done before rendering,
-    # so a line it can fix is fixed by a rebuild instead of being rendered wrong.
-    retry = False
+    # so a line it can fix is fixed by a new voice pass instead of being rendered wrong.
+    engine_retry = False
     if not args.no_qc:
         voices_file = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
-        engine_qc = run_engine_qc(project, voices_file)
-        qc["engine"] = engine_qc
-        # On the last attempt there is no rebuild left: render what there is and let qc.json say what failed.
-        retry = bool(engine_qc.get("retry")) and not last
+        qc["engine"] = run_engine_qc(project, voices_file)
+        engine_retry = bool(qc["engine"].get("retry"))
+    state.update(project=str(project), markers=markers, retry=engine_retry)
+    return state
 
+
+def stage_render(args: argparse.Namespace, out: Path, name: str, state: dict, stage: str) -> dict:
+    """Stage `render`: the video (always in this stage; with `all` only when --render), the Short, and the
+    QBank manifest. Writes <name>.qc.json."""
+    opencut = find_opencut()
+    project = Path(state["project"])
+    qc = state["qc"]
     video = None
-    if args.render and not retry:
+    if args.render or stage == "render":
         video = out / f"{name}.mp4"
         cmd = [opencut, "render", str(project), "-o", str(video)]
         # --karaoke draws the subtitles itself; burning them in again would double them.
@@ -573,21 +600,60 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
 
     if args.short:
         # The Short beside the main video: a grammar point with its practice question, vertical, under 60 s.
-        if args.visuals and args.visuals != "auto" and not retry:
+        visuals = Path(args.visuals) if args.visuals and args.visuals != "auto" else out / f"{name}.visuals.json"
+        if visuals.exists():
             import opencut_scenes
             try:
-                qc["short"] = opencut_scenes.make_short(Path(args.visuals), project)
+                qc["short"] = opencut_scenes.make_short(visuals, project)
             except opencut_scenes.ScenesError as error:
                 qc["short"] = {"error": str(error)}
         else:
             qc["short"] = {"error": "needs --visuals (scenes) to pick a grammar point"}
 
-    qbank = write_qbank_manifest(out, name, questions, audio, qc) if questions else None
+    questions = state["questions"]
+    qbank = write_qbank_manifest(out, name, questions, Path(state["audio"]), qc) if questions else None
     report = {"project": str(project), "video": str(video) if video else None,
-              "questions": [q["id"] for q in questions], "markers": markers,
-              "duration_s": result.get("duration_s"), "qc": qc, "qbank": str(qbank) if qbank else None}
+              "questions": [q["id"] for q in questions], "markers": state.get("markers", 0),
+              "duration_s": state.get("duration_s"), "qc": qc, "qbank": str(qbank) if qbank else None}
     (out / f"{name}.qc.json").write_text(json.dumps(qc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    report["_retry"] = retry
+    return report
+
+
+def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
+    """One pass over the stages. `--stage tts|scenes|render` runs one stage; its outputs are kept in
+    <name>.tts.json and the project, so a later stage (or a rerun of one stage) does not redo the others.
+    `all` (default) runs them in order, and voices again when the engine taught readings (not on `last`)."""
+    stage = getattr(args, "stage", None) or "all"
+    _resolve_scenes_arg(args)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    name = args.name or out.name
+    state_path = out / f"{name}.tts.json"
+
+    if stage in ("all", "tts"):
+        previous = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+        state = stage_tts(args, out, name)
+        if state.get("dry_run"):
+            return state
+        state["visuals_cues"] = previous.get("visuals_cues")  # kept: the scenes stage compares cue counts
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if stage == "tts":
+            return {"stage": "tts", "state": str(state_path), "qc": state["qc"]}
+    else:
+        if not state_path.exists():
+            raise PtcError(f"{state_path.name} is missing: run the tts stage first")
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+
+    if stage in ("all", "scenes"):
+        state = stage_scenes(args, out, name, state)
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if stage == "scenes":
+            return {"stage": "scenes", "project": state["project"], "qc": state["qc"], "retry": state["retry"]}
+        if state["retry"] and not last:
+            return {"_retry": True, "qc": state["qc"]}
+
+    report = stage_render(args, out, name, state, stage)
+    report["_retry"] = False
     return report
 
 
@@ -695,6 +761,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Also render a Short (vertical, under 60 s) beside the video: a grammar point and its practice question (needs --visuals)")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")
+    lesson.add_argument("--stage", choices=["all", "tts", "scenes", "render"], default="all",
+                        help="Run one stage: tts (voice, QC), scenes (project, scenes, mascot, engine QC), render "
+                             "(video, Short). Each keeps its output in <name>.tts.json or the project, so the "
+                             "next stage runs later without the earlier ones (default all)")
     lesson.add_argument("--no-qc", action="store_true", help="Skip the listen-back check and the engine check")
     lesson.add_argument("--qc-threshold", type=float, default=0.9, help="Listen-back score below which a line is wrong (0.5-1)")
     lesson.add_argument("--max-attempts", type=int, default=2,
