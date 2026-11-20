@@ -2,6 +2,7 @@ import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from "
 
 import { practiceTiming } from "./practice";
 import { Backdrop, C, FONT, Jp, Pop, SHADOW, TONES } from "./theme";
+import { SHORTS } from "./shorts";
 import type { Tone } from "./types";
 
 export type ShortProps = {
@@ -39,11 +40,11 @@ export const Short: React.FC<ShortProps> = ({ title, badge, parts, join = "+", n
   return (
     <AbsoluteFill style={{ fontFamily: FONT }}>
       <Backdrop />
-      {/* the top 130 px and bottom 330 px are covered by the Shorts interface */}
+      {/* the top and bottom covers of the Shorts interface: see shorts.ts */}
       {inPractice && practice ? (
         <PracticeCard practice={practice} t={sec - practice.at} />
       ) : (
-        <div style={{ position: "absolute", left: 60, right: 60, top: 150, display: "flex", flexDirection: "column", gap: 34 }}>
+        <div style={{ position: "absolute", left: SHORTS.margin, right: SHORTS.margin, top: SHORTS.contentTop, display: "flex", flexDirection: "column", gap: 34 }}>
           <Pop at={0.1} from="left">
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
               {badge ? (
@@ -94,7 +95,7 @@ export const Short: React.FC<ShortProps> = ({ title, badge, parts, join = "+", n
           </div>
         </div>
       )}
-      {footer && !inPractice ? <div style={{ position: "absolute", left: 0, right: 0, bottom: 360, textAlign: "center", fontSize: 32, fontWeight: 700, color: C.rose }}>{footer}</div> : null}
+      {footer && !inPractice ? <div style={{ position: "absolute", left: 0, right: 0, bottom: SHORTS.footerBottom, textAlign: "center", fontSize: 32, fontWeight: 700, color: C.rose }}>{footer}</div> : null}
     </AbsoluteFill>
   );
 };
@@ -107,7 +108,7 @@ const PracticeCard: React.FC<{ practice: NonNullable<ShortProps["practice"]>; t:
   // Pop times are on the clip's own timeline; t is measured from the start of this card.
   const base = practice.at;
   return (
-    <div style={{ position: "absolute", left: 70, right: 70, top: 260, display: "flex", flexDirection: "column", gap: 40 }}>
+    <div style={{ position: "absolute", left: SHORTS.practiceMargin, right: SHORTS.practiceMargin, top: SHORTS.practiceTop, display: "flex", flexDirection: "column", gap: 40 }}>
       <Pop at={base} from="scale">
         <div style={{ alignSelf: "center", background: TONES.sky.bg, color: TONES.sky.fg, borderRadius: 30, padding: "12px 40px", border: `4px solid ${TONES.sky.line}`, boxShadow: SHADOW }}>
           <Jp text="れんしゅう" style={{ fontSize: 40, fontWeight: 800 }} />
