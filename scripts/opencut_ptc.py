@@ -199,6 +199,23 @@ def add_chapter_markers(project_path: Path, chapters: list[tuple[str, int]]) -> 
     return len(chapters)
 
 
+def apply_chapters(script: Path, project_path: Path) -> int:
+    """Puts the script's `##` chapters in a project that is already voiced (no new voice or render), and
+    rewrites `<name>.markers.json` beside it, as `opencut render` does."""
+    _, _, chapters = parse_lesson_script(script)
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    project["markers"] = [m for m in project.get("markers", []) if m.get("kind") != "chapter"]
+    project_path.write_text(json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    add_chapter_markers(project_path, chapters)
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    clips = [a for a in project.get("audio", []) if a.get("duration")]
+    duration = max((a.get("start", 0) + a["duration"] for a in clips), default=0)
+    out = project_path.with_name(re.sub(r"\.project\.json$|\.json$", "", project_path.name) + ".markers.json")
+    out.write_text(json.dumps({"title": project.get("title", ""), "duration_seconds": duration, "markers": project["markers"]},
+                              ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return len(chapters)
+
+
 def lesson_node(*args: str) -> subprocess.CompletedProcess:
     node = shutil.which("node")
     if not node:
@@ -343,7 +360,9 @@ def make_lesson(args: argparse.Namespace) -> dict:
     else:
         script, script_tr, starts = build_script(questions)
     (out / f"{name}.script.txt").write_text(script, encoding="utf-8")
-    translated_path = out / f"{name}.script.vi.txt"
+    # With --script the input is never overwritten (it may live in this folder and holds the `##` chapter
+    # lines); what OpenCut imports is a cleaned copy beside it.
+    translated_path = out / (f"{name}.import.txt" if from_script else f"{name}.script.vi.txt")
     translated_path.write_text(script_tr, encoding="utf-8")
     if args.dry_run:
         return {"dry_run": True, "questions": [q["id"] for q in questions], "chapters": [c[0] for c in chapters],
@@ -422,6 +441,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="Check that QBank, textts and opencut are reachable")
+    chap = sub.add_parser("chapters", help="Put a script's ## chapters into an already voiced project")
+    chap.add_argument("--script", required=True)
+    chap.add_argument("--project", required=True)
     lesson = sub.add_parser("lesson", help="Listening questions from QBank -> lesson project (and video)")
     lesson.add_argument("--question", type=int, action="append", help="QBank question id; repeat for several")
     lesson.add_argument("--script", metavar="SCRIPT_TXT",
@@ -451,6 +473,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "check":
             return check()
+        if args.command == "chapters":
+            print(f"{apply_chapters(Path(args.script), Path(args.project))} chapters")
+            return 0
         print(json.dumps(make_lesson(args), ensure_ascii=False, indent=2))
         return 0
     except PtcError as error:
