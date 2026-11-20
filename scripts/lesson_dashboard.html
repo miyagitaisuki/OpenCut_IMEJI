@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>OpenCut - Hàng đợi bài giảng</title>
+<style>
+  /* Same token names as QBank (ngân hàng câu hỏi); the accent is Claude's orange. */
+  :root {
+    color-scheme: light dark;
+    --b: #d97757;
+    --b-hover: #c4663f;
+    --b-btn: #d97757;
+    --b-btn-hover: #c4663f;
+    --line: #e2e8f0;
+    --line-soft: #f1f5f9;
+    --line-ctrl: #cbd5e1;
+    --bg: #f8fafc;
+    --bg-page: #f1f5f9;
+    --surface: #ffffff;
+    --bg-hover: #f1f5f9;
+    --bg-row-hover: #fffaf7;
+    --bg-foot: #fafbfc;
+    --bg-active: #fdf3ee;
+    --ink: #0f172a;
+    --ink-2: #334155;
+    --ink-3: #475569;
+    --mut: #64748b;
+    --err: #b91c1c;
+    --err-bg: #fef2f2;
+    --err-bd: #fecaca;
+    --ok: #15803d;
+    --ok-bg: #dcfce7;
+    --ok-ink: #14532d;
+    --ok-bd: #86efac;
+    --warn: #b45309;
+    --warn-bg: #fef3c7;
+    --warn-ink: #92400e;
+    --warn-bd: #fcd34d;
+    --info-bg: #fdf3ee;
+    --info-fg: #a4502f;
+    --info-bd: #f3c9b5;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.04);
+    --shadow-lg: 0 8px 24px rgba(15,23,42,.15);
+    accent-color: var(--b);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --b: #e8946f; --b-hover: #f0a886; --b-btn: #d97757; --b-btn-hover: #c4663f;
+      --line: #293548; --line-soft: #1e293b; --line-ctrl: #334155;
+      --bg: #182234; --bg-page: #0b1120; --surface: #111827;
+      --bg-hover: #1e293b; --bg-row-hover: #1b1a1f; --bg-foot: #0f172a;
+      --bg-active: #2a1c16; --ink: #f1f5f9; --ink-2: #cbd5e1; --ink-3: #94a3b8; --mut: #94a3b8;
+      --err: #fca5a5; --err-bg: #450a0a; --err-bd: #7f1d1d;
+      --ok: #4ade80; --ok-bg: #052e16; --ok-ink: #bbf7d0; --ok-bd: #166534;
+      --warn: #fbbf24; --warn-bg: #451a03; --warn-ink: #fde68a; --warn-bd: #92400e;
+      --info-bg: #2a1c16; --info-fg: #f3c9b5; --info-bd: #7c3d28;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.35); --shadow-lg: 0 10px 28px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --b: #e8946f; --b-hover: #f0a886; --b-btn: #d97757; --b-btn-hover: #c4663f;
+    --line: #293548; --line-soft: #1e293b; --line-ctrl: #334155;
+    --bg: #182234; --bg-page: #0b1120; --surface: #111827;
+    --bg-hover: #1e293b; --bg-row-hover: #1b1a1f; --bg-foot: #0f172a;
+    --bg-active: #2a1c16; --ink: #f1f5f9; --ink-2: #cbd5e1; --ink-3: #94a3b8; --mut: #94a3b8;
+    --err: #fca5a5; --err-bg: #450a0a; --err-bd: #7f1d1d;
+    --ok: #4ade80; --ok-bg: #052e16; --ok-ink: #bbf7d0; --ok-bd: #166534;
+    --warn: #fbbf24; --warn-bg: #451a03; --warn-ink: #fde68a; --warn-bd: #92400e;
+    --info-bg: #2a1c16; --info-fg: #f3c9b5; --info-bd: #7c3d28;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.35); --shadow-lg: 0 10px 28px rgba(0,0,0,.5);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 Inter, system-ui, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg-page); }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header b { font-size: 15px; }
+  header .mut { color: var(--mut); font-size: 13px; }
+  main { padding: 16px; max-width: 1200px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-sm); overflow: hidden; }
+  .card h2 { font-size: 13px; margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; display: flex; justify-content: space-between; align-items: center; }
+  .card .body { padding: 12px 14px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 12px; color: var(--mut); font-weight: 600; background: var(--bg-foot); }
+  tr.row { cursor: pointer; }
+  tr.row:hover { background: var(--bg-row-hover); }
+  tr.row.on { background: var(--bg-active); }
+  input, select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line-ctrl); border-radius: 6px; background: var(--surface); color: var(--ink); }
+  button { cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.p { background: var(--b-btn); color: #fff; border-color: var(--b-btn); }
+  button.p:hover:not(:disabled) { background: var(--b-btn-hover); }
+  button.d { color: var(--err); }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line-ctrl); color: var(--ink-3); background: var(--bg-hover); }
+  .chip.running, .chip.publishing, .chip.queued, .chip.queued_publish, .chip.queued_finish, .chip.waiting_quota { color: var(--info-fg); background: var(--info-bg); border-color: var(--info-bd); }
+  .chip.awaiting_approval, .chip.quarantine { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bd); }
+  .chip.done { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
+  .chip.failed, .chip.cancelled { color: var(--err); background: var(--err-bg); border-color: var(--err-bd); }
+  .stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .stage { border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 13px; }
+  .stage b { display: block; margin-bottom: 4px; }
+  .notice { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-bd); white-space: pre-wrap; }
+  .err { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; background: var(--err-bg); color: var(--err); border: 1px solid var(--err-bd); white-space: pre-wrap; }
+  pre.log { margin: 10px 0 0; max-height: 360px; overflow: auto; background: var(--bg-foot); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12px/1.45 ui-monospace, Consolas, monospace; color: var(--ink-2); white-space: pre-wrap; }
+  .empty { color: var(--mut); padding: 24px 0; text-align: center; }
+  .mut { color: var(--mut); }
+  #toast { position: fixed; right: 16px; bottom: 16px; background: var(--ink); color: var(--surface); padding: 10px 14px; border-radius: 8px; box-shadow: var(--shadow-lg); display: none; max-width: 420px; }
+</style>
+</head>
+<body>
+<header>
+  <b>OpenCut</b><span class="mut">Hàng đợi bài giảng</span>
+  <span class="mut" id="stamp" style="margin-left:auto"></span>
+  <button id="theme" title="Đổi giao diện sáng/tối">Sáng / Tối</button>
+</header>
+<main>
+  <section class="card">
+    <h2>Bài giảng <span class="mut" id="count"></span></h2>
+    <div class="body" style="padding:0">
+      <table>
+        <thead><tr><th>Bài</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead>
+        <tbody id="jobs"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">Chưa có bài nào.</div>
+    </div>
+  </section>
+
+  <section class="card" id="detail-card">
+    <h2 id="detail-title">Chi tiết</h2>
+    <div class="body" id="detail"><div class="empty">Chọn một bài bên trái.</div></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const STAGES = ["tts", "scenes", "render", "mix", "qc", "publish"];
+const LABEL = {
+  queued: "Chờ", running: "Đang chạy", quarantine: "Cần duyệt", awaiting_approval: "Chờ duyệt đăng",
+  publishing: "Đang đăng", queued_publish: "Chờ đăng", queued_finish: "Chờ hoàn tất", waiting_quota: "Chờ hạn mức",
+  done: "Xong", failed: "Lỗi", cancelled: "Đã hủy",
+};
+let selected = null;
+let jobs = [];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const chip = (status) => `<span class="chip ${esc(status)}">${esc(LABEL[status] || status)}</span>`;
+const when = (t) => (t ? new Date(t * 1000).toLocaleString("vi-VN") : "");
+
+function toast(text) {
+  const el = $("toast");
+  el.textContent = text;
+  el.style.display = "block";
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (el.style.display = "none"), 4000);
+}
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let data = text;
+  try { data = JSON.parse(text); } catch (e) {}
+  if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+  return data;
+}
+
+async function loadJobs() {
+  try {
+    jobs = await api("GET", "/jobs");
+  } catch (e) {
+    toast("Không đọc được job server: " + e.message);
+    return;
+  }
+  $("stamp").textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
+  $("count").textContent = `(${jobs.length})`;
+  $("empty").style.display = jobs.length ? "none" : "block";
+  $("jobs").innerHTML = jobs.map((j) => `
+    <tr class="row ${j.id === selected ? "on" : ""}" data-id="${esc(j.id)}">
+      <td>${esc(j.spec?.title || j.spec?.name || j.id)}<div class="mut" style="font-size:12px">${esc(j.spec?.name || "")}</div></td>
+      <td>${chip(j.status)}</td>
+      <td class="mut" style="font-size:12px">${when(j.updated)}</td>
+    </tr>`).join("");
+  document.querySelectorAll("tr.row").forEach((tr) => tr.addEventListener("click", () => select(tr.dataset.id)));
+  if (selected) renderDetail();
+}
+
+function select(id) {
+  selected = id;
+  loadJobs();
+}
+
+async function renderDetail() {
+  const job = jobs.find((j) => j.id === selected);
+  if (!job) { $("detail").innerHTML = '<div class="empty">Chọn một bài bên trái.</div>'; return; }
+  $("detail-title").textContent = job.spec?.title || job.id;
+  const stages = STAGES.map((s) => {
+    const info = job.stages?.[s] || {};
+    return `<div class="stage"><b>${esc(s)}</b>${chip(info.status || "pending")}${info.cached ? ' <span class="mut" style="font-size:12px">(dùng lại)</span>' : ""}</div>`;
+  }).join("");
+  const warnings = (job.outputs?.warnings || []).map((w) => `<div class="notice">${esc(w)}</div>`).join("");
+  const error = job.error ? `<div class="err">${esc(job.error)}</div>` : "";
+  const qc = job.outputs?.qc_status ? `<div class="mut" style="margin-top:8px">QC: <b>${esc(job.outputs.qc_status)}</b></div>` : "";
+  const yt = job.outputs?.youtube ? `<div style="margin-top:8px">Đã đăng: <a href="${esc(job.outputs.youtube)}" target="_blank" rel="noopener">${esc(job.outputs.youtube)}</a></div>` : "";
+  const actions = [
+    job.status === "quarantine" ? `<button class="p" data-act="accept">Đã duyệt, tiếp tục</button>` : "",
+    ["failed", "cancelled", "quarantine"].includes(job.status) ? `<button data-act="retry">Chạy lại</button>` : "",
+    ["failed", "quarantine"].includes(job.status) ? `<button data-act="force">Chạy lại toàn bộ</button>` : "",
+    job.status === "awaiting_approval" ? `<button class="p" data-act="publish">Duyệt đăng YouTube</button>` : "",
+    ["queued", "running", "queued_publish", "queued_finish", "waiting_quota", "quarantine", "awaiting_approval"].includes(job.status) ? `<button class="d" data-act="cancel">Hủy</button>` : "",
+  ].join("");
+  $("detail").innerHTML = `
+    <div>${chip(job.status)} <span class="mut" style="margin-left:8px">${esc(job.id)}</span></div>
+    <div class="stages">${stages}</div>
+    ${error}${warnings}${qc}${yt}
+    <div class="row-actions">${actions}</div>
+    <div class="row-actions"><button data-act="log">Xem nhật ký</button></div>
+    <pre class="log" id="log" style="display:none"></pre>`;
+  document.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act, job)));
+}
+
+async function act(name, job) {
+  try {
+    if (name === "log") {
+      const log = $("log");
+      const res = await fetch(`/jobs/${job.id}/log`);
+      log.textContent = (await res.text()).slice(-20000);
+      log.style.display = "block";
+      return;
+    }
+    if (name === "accept") await api("POST", `/jobs/${job.id}/accept`);
+    if (name === "retry") await api("POST", `/jobs/${job.id}/retry`, {});
+    if (name === "force") {
+      if (!confirm("Chạy lại toàn bộ các bước (kể cả bước đã xong)?")) return;
+      await api("POST", `/jobs/${job.id}/retry`, { force: true });
+    }
+    if (name === "cancel") {
+      if (!confirm("Hủy bài này?")) return;
+      await api("POST", `/jobs/${job.id}/cancel`, {});
+    }
+    if (name === "publish") {
+      if (!confirm("Đăng bài này lên YouTube? Chỉ làm khi bạn đã xem video và QC báo đạt.")) return;
+      await api("POST", `/jobs/${job.id}/publish`, {});
+    }
+    toast("Đã gửi yêu cầu");
+    loadJobs();
+  } catch (e) {
+    toast("Lỗi: " + e.message);
+  }
+}
+
+// Theme: the same switch as QBank (localStorage "color-scheme").
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = mode;
+  localStorage.setItem("color-scheme", mode);
+}
+$("theme").addEventListener("click", () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const now = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  applyTheme(now === "dark" ? "light" : "dark");
+});
+const saved = localStorage.getItem("color-scheme");
+if (saved === "light" || saved === "dark") applyTheme(saved);
+
+loadJobs();
+setInterval(loadJobs, 5000);
+</script>
+</body>
+</html>
