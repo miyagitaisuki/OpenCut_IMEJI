@@ -15,3 +15,4 @@ public/avatars/live2d-*/*
 
 # Chibi pose pictures are the teacher's own art (avatar.json stays).
 public/avatars/chibi/pose_*.png
+public/_lesson/

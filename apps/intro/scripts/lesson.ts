@@ -17,7 +17,8 @@
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { align, karaoke, type Heard } from "../src/lesson/karaoke.ts";
@@ -123,8 +124,29 @@ function words(projectPath: string): string {
   return file;
 }
 
+/**
+ * Remotion reads pictures from public/ only. A picture named in a scene (next to the
+ * visuals file, or an absolute path) is copied to public/_lesson/ and the scene points there.
+ */
+export function stageImages(visuals: VisualsFile, visualsPath: string): void {
+  const publicDir = join(root, "public");
+  for (const scene of visuals.scenes ?? []) {
+    if (scene.template !== "image") continue;
+    for (const im of scene.images) {
+      if (/^https?:\/\//.test(im.src) || existsSync(join(publicDir, im.src))) continue;
+      const file = resolve(dirname(resolve(visualsPath)), im.src);
+      if (!existsSync(file)) throw new Error(`scene at cue ${scene.cue}: picture not found: ${im.src} (looked for ${file})`);
+      const name = `${createHash("sha1").update(file).digest("hex").slice(0, 8)}-${basename(file)}`;
+      mkdirSync(join(publicDir, "_lesson"), { recursive: true });
+      copyFileSync(file, join(publicDir, "_lesson", name));
+      im.src = `_lesson/${name}`;
+    }
+  }
+}
+
 export function buildProps(visualsPath: string, projectPath: string): LessonProps {
   const visuals = readJson<VisualsFile>(visualsPath);
+  stageImages(visuals, visualsPath);
   const project = readJson<Project>(projectPath);
   const cues: Cue[] = project.subtitles ?? [];
   const { start, end } = bodyRange(project);

@@ -84,6 +84,7 @@ furigana: `食{た}べる`. Items inside a scene pop in one after another.
 | `compare` | `title?`, `left`/`right: {title, items[], tone?}` |
 | `chart` | `title?`, `kind: "bar"\|"donut"`, `items: [{label, value}]`, `unit?`, `highlight?` (index) |
 | `dialogue` | `title?`, `layout?: "bubbles"\|"timeline"`, `lines: [{who?, text, side?}]` |
+| `image` | `title?`, `images: [{src, caption?}]` (1-3), `tone?`, `note?`. `src` is a picture next to the visuals file (PNG/JPG/SVG/WebP) or an absolute path; it is copied to `public/_lesson/` (git-ignored). Made with an image AI (Flux, Midjourney...) or drawn: mind the licence of what you use. |
 
 `tone` is `pink`, `navy`, `mint`, `sun` or `sky`. Examples: `scenes/lesson-sample.visuals.json`
 (every template, with made-up numbers) and `scenes/ptc-vi.visuals.json` (a real listening lesson).

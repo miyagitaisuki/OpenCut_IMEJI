@@ -1,8 +1,8 @@
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
 import { Accent } from "./Accent";
 import { C, FIRST, FONT, Jp, Pop, SAFE, SHADOW, STAGGER, SceneFrame, TONES, useReveal } from "./theme";
-import type { ChartScene, CompareScene, DialogueScene, GrammarScene, KeywordScene, LessonScene, TitleScene } from "./types";
+import type { ChartScene, CompareScene, DialogueScene, GrammarScene, ImageScene, KeywordScene, LessonScene, TitleScene } from "./types";
 
 type P<T> = { scene: T; duration: number };
 
@@ -158,6 +158,44 @@ export const Compare: React.FC<P<CompareScene>> = ({ scene, duration }) => (
     </div>
   </SceneFrame>
 );
+
+const IMAGE_W = [0, 900, 640, 500];
+const IMAGE_H = [0, 330, 310, 280];
+
+/** Pictures on cards that drift in slowly (Ken Burns), each with its caption. */
+export const Picture: React.FC<P<ImageScene>> = ({ scene, duration }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const n = Math.min(3, Math.max(1, scene.images.length));
+  const tone = TONES[scene.tone ?? "pink"];
+  const w = IMAGE_W[n];
+  const h = IMAGE_H[n];
+  // Slow push in; capped so a long scene does not zoom on and on.
+  const zoom = 1 + Math.min(0.08, (frame / fps) * 0.012);
+  return (
+    <SceneFrame duration={duration} title={scene.title}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", gap: 28 }}>
+          {scene.images.slice(0, 3).map((im, i) => (
+            <Pop key={i} at={at(i)} from={i % 2 ? "right" : "left"}>
+              <div style={{ width: w, background: "#fff", borderRadius: 30, border: `4px solid ${tone.line}`, boxShadow: SHADOW, overflow: "hidden" }}>
+                <div style={{ width: w, height: h, overflow: "hidden", background: tone.bg }}>
+                  <Img src={im.src.startsWith("http") ? im.src : staticFile(im.src)} style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${zoom})` }} />
+                </div>
+                {im.caption ? (
+                  <div style={{ padding: "12px 20px 16px", textAlign: "center" }}>
+                    <Jp text={im.caption} style={{ fontSize: 34, fontWeight: 700, color: C.navy }} />
+                  </div>
+                ) : null}
+              </div>
+            </Pop>
+          ))}
+        </div>
+        {scene.note ? <Jp text={scene.note} style={{ fontSize: 30, fontWeight: 600, color: C.navySoft }} /> : null}
+      </div>
+    </SceneFrame>
+  );
+};
 
 const PALETTE = [C.pink, C.sky, C.mint, C.sun, "#e3d0ff"];
 
@@ -380,6 +418,8 @@ const Body: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, durat
       return <Chart scene={scene} duration={duration} />;
     case "dialogue":
       return <Dialogue scene={scene} duration={duration} />;
+    case "image":
+      return <Picture scene={scene} duration={duration} />;
     case "keyword":
       return <Keyword scene={scene} duration={duration} />;
   }

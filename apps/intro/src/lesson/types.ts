@@ -71,8 +71,18 @@ export type KeywordScene = {
   caption?: string;
 };
 
+export type ImageScene = Timing & {
+  template: "image";
+  title?: string;
+  /** One to three pictures side by side. `src` is a file next to the visuals file, or an absolute path. */
+  images: { src: string; caption?: string }[];
+  tone?: Tone;
+  note?: string;
+};
+
 export type LessonScene =
   | TitleScene
+  | ImageScene
   | GrammarScene
   | CompareScene
   | ChartScene
