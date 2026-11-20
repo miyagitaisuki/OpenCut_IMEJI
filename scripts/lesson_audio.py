@@ -36,7 +36,7 @@ LUFS = -16.0
 # The music chain, shared with scripts/measure_ducking.py: every track lands at the same level, then the voice
 # (the key) pulls it down while someone speaks.
 MUSIC_FILTER = "loudnorm=I=-30:TP=-3:LRA=7,volume={music_db}dB"
-DUCK_FILTER = "sidechaincompress=threshold=0.02:ratio=8:attack=20:release=600:makeup=1"
+DUCK_FILTER = "sidechaincompress=threshold=0.015:ratio=20:attack=20:release=600:makeup=1"
 
 
 class AudioError(RuntimeError):

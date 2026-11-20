@@ -95,12 +95,17 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) 
 
 ## 7. Trạng thái các bước (cập nhật sau phiên này)
 
-- **Bước 1**: xong (PR #21, #22, #23 đã merge; không cần tách lại).
-- **Bước 2**: xong. SQLite + hash theo stage, tách tts/scenes/render, quarantine và `accept`, `retry {"force": true}`, cache theo câu cho bước nghe lại (`<name>.qc-lines.json`).
-- **Bước 3**: xong phần code (quota theo ngày Pacific, `waiting_quota`, `--publish-at`). Chưa upload thật. Trạng thái audit OAuth không kiểm tra được qua API.
-- **Bước 4**: quyết định: giữ Whisper cho timing từ/chữ. textts chỉ trả timeline theo câu (`start_ms`/`end_ms`), không có mốc mora hay từ, nên không thay được.
-- **Bước 5**: xong. `scene_spec.schema.json` là SceneSpec; Claude trả đầu ra qua tool `submit_scenes` (structured output); kiểm tra bằng `validate_spec` (stdlib) và `lesson check`; sai sau 2 lượt thì exit 3 và job vào `quarantine`.
-- **Bước 6**: đang đo. `scripts/homograph_eval.json` và `scripts/eval_homographs.py` (cần fugashi + unidic-lite, dùng Python 3.10): 10/12 đúng. Sai: 市場 (いちば) và 辛い (からい). Chưa áp dụng vào pipeline.
-- **Bước 7**: một phần. Thumbnail (Remotion renderStill) đã nối vào job trước bước publish dry-run; lỗi chỉ ghi cảnh báo. Chưa tách hằng số vùng an toàn Shorts.
-- **Bước 8**: chưa làm. Cần đo encoder trên máy thật; `libx264` là GPL, xem lại NOTICES.md trước.
-- **Bước 9**: MCP `submit_lesson_job`, `get_job_status`, `list_quarantine` đã có (apps/cli, gọi HTTP tới job server). Chưa có tool đăng video (cố ý). Dashboard `/dashboard` đã có (HTML tĩnh). Đã có nghe đoạn bị flag và nhập cách đọc cho textts (`scripts/pron_review.py`); chạy lại để tạo lại giọng.
+- **Bước 1**: xong (PR #21, #22, #23 đã merge).
+- **Bước 2**: xong. SQLite, hash theo stage, tách tts/scenes/render, quarantine và `accept`, `retry {"force": true}`, cache theo câu cho bước nghe lại.
+- **Bước 3**: xong. Upload, quota theo ngày Pacific, `waiting_quota`, `--publish-at`. Đã đăng nhập OAuth thật.
+- **Bước 4**: quyết định giữ Whisper cho timing từ/chữ. textts chỉ có mốc theo câu.
+- **Bước 5**: xong. SceneSpec qua `submit_scenes`, kiểm tra schema và `lesson check`, sai sau 2 lượt thì quarantine.
+- **Bước 6**: fugashi là bộ đọc thứ hai. `homograph_suggest.py` gợi ý mọi từ Hán chưa có furigana (không chỉ 5 từ có quy tắc), ghi file cho người duyệt, không tự sửa. Chạy fugashi cần Python có wheel (3.10), đặt `OPENCUT_TAGGER_PYTHON`.
+- **Bước 7**: xong. Thumbnail nối vào job; vùng an toàn Shorts trong `apps/intro/src/lesson/shorts.ts`.
+- **Bước 8**:
+  - Ducking: nhạc giảm 21,8 dB khi có giọng (sidechain threshold 0,015, ratio 20), trong mục tiêu 18–24 dB. Đo bằng `measure_ducking.py`.
+  - Encoder mặc định: `h264_mf` (MediaFoundation, nhanh, PSNR 55 dB ở 2 Mbps). `h264_amf` chưa dùng được (PSNR ~38 dB). `libx264` không có trong bản FFmpeg đang dùng.
+  - Gộp audio và ducking đã là một đồ thị FFmpeg, video copy.
+- **Bước 9**: xong. MCP `submit_lesson_job`, `get_job_status`, `list_quarantine`; dashboard `/dashboard`; nghe đoạn bị flag và nhập cách đọc cho textts (`pron_review.py`). Cố ý không có tool đăng video.
+
+Còn lại: không có mục bắt buộc. Việc tùy chọn: thêm bộ đo `pron` trên bài thật, và kiểm tra ducking trên bài có nhạc nền thật.
