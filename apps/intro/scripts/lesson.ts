@@ -226,7 +226,8 @@ async function thumbnail(jsonPath: string): Promise<string> {
 
 /**
  * A vertical Short about one grammar point: the `grammar` scene at cue `--grammar`, then the
- * `examples` scene that follows it. Picture only (silent); `shortAudio` cuts the voice for it.
+ * `examples` scene that follows it, then the `practice` scene after that when there is one.
+ * Picture only (silent); the voice is cut from the project for the same span.
  */
 export function shortProps(visualsPath: string, projectPath: string, grammarCue: number): { props: Record<string, unknown>; from: number; to: number } {
   const visuals = readJson<VisualsFile>(visualsPath);
@@ -238,7 +239,11 @@ export function shortProps(visualsPath: string, projectPath: string, grammarCue:
   const g = scenes[gi];
   const ex = scenes[gi + 1];
   if (g.template !== "grammar" || !ex || ex.template !== "examples") throw new Error(`the scene after the grammar one at cue ${grammarCue} must be "examples"`);
-  const last = Math.min((ex.until_cue ?? (scenes[gi + 2]?.cue ?? cues.length) - 1), cues.length - 1);
+  // A practice scene right after the examples is part of the Short (one question, with its answer).
+  const pr = scenes[gi + 2]?.template === "practice" ? scenes[gi + 2] : undefined;
+  const endIdx = pr ? gi + 2 : gi + 1;
+  const endScene = pr ?? ex;
+  const last = Math.min(endScene.until_cue ?? ((scenes[endIdx + 1]?.cue ?? cues.length) - 1), cues.length - 1);
   const from = cues[g.cue].start;
   const to = cues[last].end + 0.8;
   const dir = dirname(resolve(visualsPath));
@@ -256,6 +261,17 @@ export function shortProps(visualsPath: string, projectPath: string, grammarCue:
       at: Math.max(0.3, (cues[Math.min(it.cue ?? ex.cue + i, cues.length - 1)].start - from)),
     })),
     footer: option("--footer"),
+    practice: pr
+      ? {
+          question: pr.question,
+          options: pr.options,
+          answer: pr.answer,
+          explain: pr.explain,
+          think: Math.min(pr.think ?? 5, 8),
+          at: cues[pr.cue].start - from,
+          length: to - cues[pr.cue].start,
+        }
+      : undefined,
   };
   return { props, from, to };
 }
