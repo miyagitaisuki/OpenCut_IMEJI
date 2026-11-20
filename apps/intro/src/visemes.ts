@@ -93,3 +93,21 @@ export function queryDuration(query: AudioQuery): number {
   }
   return total * scale;
 }
+
+/**
+ * The mouth at `seconds` and how open it is (0..1): it eases in over the
+ * first 40 ms of a vowel and out over the last 40 ms, so a 3D mouth does not
+ * snap between shapes. Closed (blend 1) outside any viseme.
+ */
+export function mouthStateAt(list: Viseme[], seconds: number): { mouth: Mouth; blend: number } {
+  const EASE = 0.04;
+  for (const v of list) {
+    if (seconds < v.start) break;
+    if (seconds < v.end) {
+      const ease = Math.min(EASE, (v.end - v.start) / 2);
+      const blend = Math.min(1, (seconds - v.start) / ease, (v.end - seconds) / ease);
+      return { mouth: v.mouth, blend: Math.max(0, blend) };
+    }
+  }
+  return { mouth: "n", blend: 1 };
+}

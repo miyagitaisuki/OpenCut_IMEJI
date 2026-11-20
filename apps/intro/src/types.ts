@@ -1,3 +1,4 @@
+import type { VrmConfig } from "./VrmAvatar";
 import type { Mouth, Viseme } from "./visemes";
 
 /** What a teacher writes: `scenes/<name>.json`. */
@@ -48,7 +49,9 @@ export type AvatarManifest = {
   };
   /** Sticker effects by name, e.g. lightbulb, sweat, sparkle, exclamation. */
   fx?: Record<string, string>;
-  layers: {
+  /** A 3D VRM model instead of the layered pictures (`layers` and `rig` are then unused). */
+  vrm?: VrmConfig;
+  layers?: {
     body?: string;
     eyes_open: string;
     eyes_closed: string;

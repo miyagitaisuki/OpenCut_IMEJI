@@ -34,6 +34,8 @@ const args = [
   `--props=${resolve(props)}`,
   // H.264 + AAC, which OpenCut and every player read.
   "--codec=h264",
+  // three.js (the VRM avatars) needs ANGLE; the 2D avatars do not mind it.
+  "--gl=angle",
   "--log=error",
 ];
 if (process.env.REMOTION_BROWSER) args.push(`--browser-executable=${process.env.REMOTION_BROWSER}`);

@@ -11,7 +11,9 @@ import {
 } from "remotion";
 
 import type { IntroProps } from "./types";
-import { mouthAt } from "./visemes";
+import type { Mouth } from "./visemes";
+import { VrmAvatar, type VrmPoseState } from "./VrmAvatar";
+import { mouthAt, mouthStateAt } from "./visemes";
 
 /** Seconds before the avatar starts talking, and after it stops. */
 export const LEAD_IN = 0.8;
@@ -38,14 +40,24 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
           transform: `translateY(${(1 - enter) * 400}px)`,
         }}
       >
-        <Avatar
-          avatar={avatar}
-          frame={frame}
-          fps={fps}
-          mouth={mouthAt(visemes, talking)}
-          gesture={gestureTimeline(scene.gestures, talking, LEAD_IN, fps)}
-          smiling={talking > voiceSeconds + 0.3}
-        />
+        {avatar.vrm ? (
+          <VrmAvatar
+            folder={avatar.folder}
+            config={avatar.vrm}
+            width={1000}
+            height={1080}
+            state={vrmState(frame, fps, talking, voiceSeconds, visemes, gestureTimeline(scene.gestures, talking, LEAD_IN, fps))}
+          />
+        ) : (
+          <Avatar
+            avatar={avatar}
+            frame={frame}
+            fps={fps}
+            mouth={mouthAt(visemes, talking)}
+            gesture={gestureTimeline(scene.gestures, talking, LEAD_IN, fps)}
+            smiling={talking > voiceSeconds + 0.3}
+          />
+        )}
         {scene.effects && <Effects avatar={avatar} effects={scene.effects} frame={frame} fps={fps} />}
       </div>
       <div
@@ -98,10 +110,12 @@ const Avatar: React.FC<{
   avatar: IntroProps["avatar"];
   frame: number;
   fps: number;
-  mouth: keyof IntroProps["avatar"]["layers"]["mouth"];
+  mouth: Mouth;
   gesture: GestureState;
   smiling: boolean;
 }> = ({ avatar, frame, fps, mouth, gesture, smiling }) => {
+  const layers = avatar.layers;
+  if (!layers) return null;
   const [w, h] = avatar.size;
   const scale = 1040 / h;
   const height = h * scale;
@@ -114,11 +128,11 @@ const Avatar: React.FC<{
     />
   );
   const eyes =
-    smiling && avatar.layers.eyes_happy
-      ? avatar.layers.eyes_happy
+    smiling && layers.eyes_happy
+      ? layers.eyes_happy
       : blinking(frame, fps)
-        ? avatar.layers.eyes_closed
-        : avatar.layers.eyes_open;
+        ? layers.eyes_closed
+        : layers.eyes_open;
   const box: React.CSSProperties = { position: "relative", width: w * scale, height };
 
   const rig = avatar.rig;
@@ -128,9 +142,9 @@ const Avatar: React.FC<{
     const sway = Math.sin((frame / fps) * Math.PI * 0.45) * 1.5;
     return (
       <div style={{ ...box, transform: `translateY(${bob}px) rotate(${sway}deg)`, transformOrigin: "50% 100%" }}>
-        {avatar.layers.body && layer(avatar.layers.body)}
+        {layers.body && layer(layers.body)}
         {layer(eyes)}
-        {layer(avatar.layers.mouth[mouth])}
+        {layer(layers.mouth[mouth])}
       </div>
     );
   }
@@ -193,7 +207,7 @@ const Avatar: React.FC<{
       >
         {layer(rig.head)}
         {layer(eyes, { transform: `translateX(${glanceX}px)` })}
-        {layer(avatar.layers.mouth[mouth])}
+        {layer(layers.mouth[mouth])}
       </div>
     </div>
   );
@@ -227,6 +241,8 @@ const Effects: React.FC<{
   frame: number;
   fps: number;
 }> = ({ avatar, effects, frame, fps }) => {
+  const layers = avatar.layers;
+  if (!layers) return null;
   const [w, h] = avatar.size;
   const scale = 1040 / h;
   return (
@@ -334,3 +350,27 @@ const Petals: React.FC<{ frame: number; width: number; height: number }> = ({ fr
   });
   return <>{petals}</>;
 };
+
+/** The VRM's pose inputs for one frame (all derived from the frame number). */
+function vrmState(
+  frame: number,
+  fps: number,
+  talking: number,
+  voiceSeconds: number,
+  list: IntroProps["visemes"],
+  gesture: GestureState,
+): VrmPoseState {
+  const { mouth, blend } = mouthStateAt(list, talking);
+  return {
+    frame,
+    fps,
+    mouth,
+    mouthBlend: blend,
+    blinking: blinking(frame, fps),
+    smiling: talking > voiceSeconds + 0.3,
+    speaking: mouth !== "n",
+    gesture: gesture.current,
+    previousGesture: gesture.previous,
+    gestureMix: gesture.previous ? Math.min(1, Math.max(0, (frame - gesture.startFrame) / 9)) : 1,
+  };
+}

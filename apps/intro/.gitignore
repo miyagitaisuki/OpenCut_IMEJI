@@ -4,3 +4,6 @@ out/
 public/voices/
 scenes/*.props.json
 !scenes/sample.props.json
+
+# 10 MB sample VRM: fetched by scripts/fetch-vrm-sample.ts
+public/avatars/*/model.vrm
