@@ -103,4 +103,4 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) 
 - **Bước 6**: đang đo. `scripts/homograph_eval.json` và `scripts/eval_homographs.py` (cần fugashi + unidic-lite, dùng Python 3.10): 10/12 đúng. Sai: 市場 (いちば) và 辛い (からい). Chưa áp dụng vào pipeline.
 - **Bước 7**: một phần. Thumbnail (Remotion renderStill) đã nối vào job trước bước publish dry-run; lỗi chỉ ghi cảnh báo. Chưa tách hằng số vùng an toàn Shorts.
 - **Bước 8**: chưa làm. Cần đo encoder trên máy thật; `libx264` là GPL, xem lại NOTICES.md trước.
-- **Bước 9**: MCP `submit_lesson_job`, `get_job_status`, `list_quarantine` đã có (apps/cli, gọi HTTP tới job server). Chưa có tool đăng video. Dashboard cần quyết định công nghệ.
+- **Bước 9**: MCP `submit_lesson_job`, `get_job_status`, `list_quarantine` đã có (apps/cli, gọi HTTP tới job server). Chưa có tool đăng video (cố ý). Dashboard `/dashboard` đã có (HTML tĩnh). Đã có nghe đoạn bị flag và nhập cách đọc cho textts (`scripts/pron_review.py`); chạy lại để tạo lại giọng.
