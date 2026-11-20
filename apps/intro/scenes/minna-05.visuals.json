@@ -1,0 +1,249 @@
+{
+  "scenes": [
+    {
+      "template": "title",
+      "cue": 0,
+      "until_cue": 1,
+      "title": "第{だい}5課{か}",
+      "subtitle": "どこへ・何{なに}で・だれと",
+      "badge": "N5"
+    },
+    {
+      "template": "compare",
+      "cue": 3,
+      "until_cue": 6,
+      "title": "動{うご}く方向{ほうこう}",
+      "left": {
+        "title": "行{い}きます",
+        "items": [
+          "ここ → 向{む}こう",
+          "図書館{としょかん}へ行{い}きます"
+        ],
+        "tone": "pink"
+      },
+      "right": {
+        "title": "来{き}ます・帰{かえ}ります",
+        "items": [
+          "向{む}こう → ここ",
+          "家{いえ}へ帰{かえ}ります"
+        ],
+        "tone": "sky"
+      }
+    },
+    {
+      "template": "grammar",
+      "cue": 8,
+      "until_cue": 11,
+      "title": "「へ」は矢印{やじるし}",
+      "parts": [
+        {
+          "text": "場所{ばしょ}",
+          "label": "どこ"
+        },
+        {
+          "text": "へ",
+          "label": "→ 矢印{やじるし}",
+          "tone": "pink"
+        },
+        {
+          "text": "行{い}きます",
+          "tone": "navy"
+        }
+      ],
+      "result": {
+        "text": "図書館{としょかん}へ行{い}きます"
+      },
+      "note": "行{い}く方向{ほうこう}を指{さ}す矢印{やじるし}"
+    },
+    {
+      "template": "grammar",
+      "cue": 12,
+      "until_cue": 15,
+      "title": "「で」は車{くるま}",
+      "parts": [
+        {
+          "text": "乗{の}り物{もの}",
+          "label": "何{なに}で"
+        },
+        {
+          "text": "で",
+          "label": "運{はこ}ぶ車{くるま}",
+          "tone": "sun"
+        },
+        {
+          "text": "行{い}きます",
+          "tone": "navy"
+        }
+      ],
+      "result": {
+        "text": "電車{でんしゃ}で行{い}きます"
+      },
+      "note": "歩{ある}くときは「歩{ある}いて」"
+    },
+    {
+      "template": "grammar",
+      "cue": 16,
+      "until_cue": 19,
+      "title": "「と」は手{て}をつなぐ",
+      "parts": [
+        {
+          "text": "人{ひと}",
+          "label": "だれと"
+        },
+        {
+          "text": "と",
+          "label": "手{て}をつなぐ",
+          "tone": "mint"
+        },
+        {
+          "text": "行{い}きます",
+          "tone": "navy"
+        }
+      ],
+      "result": {
+        "text": "友達{ともだち}と行{い}きます"
+      },
+      "note": "一人{ひとり}のときは「一人{ひとり}で」"
+    },
+    {
+      "template": "grammar",
+      "cue": 20,
+      "until_cue": 21,
+      "title": "全部{ぜんぶ}つなげる",
+      "parts": [
+        {
+          "text": "友達{ともだち}と",
+          "tone": "mint"
+        },
+        {
+          "text": "電車{でんしゃ}で",
+          "tone": "sun"
+        },
+        {
+          "text": "京都{きょうと}へ",
+          "tone": "pink"
+        },
+        {
+          "text": "行{い}きます",
+          "tone": "navy"
+        }
+      ],
+      "accent": "star"
+    },
+    {
+      "template": "dialogue",
+      "cue": 22,
+      "until_cue": 26,
+      "title": "会話{かいわ}",
+      "layout": "bubbles",
+      "lines": [
+        {
+          "who": "ふみ",
+          "text": "週末{しゅうまつ}、どこへ行{い}きますか。",
+          "side": "left"
+        },
+        {
+          "who": "花音{かのん}",
+          "text": "海{うみ}へ行{い}きます。",
+          "side": "right"
+        },
+        {
+          "who": "ふみ",
+          "text": "何{なに}で行{い}きますか。",
+          "side": "left"
+        },
+        {
+          "who": "花音{かのん}",
+          "text": "バスで行{い}きます。",
+          "side": "right"
+        }
+      ]
+    },
+    {
+      "template": "dialogue",
+      "cue": 27,
+      "until_cue": 28,
+      "title": "会話{かいわ}",
+      "layout": "bubbles",
+      "lines": [
+        {
+          "who": "ふみ",
+          "text": "だれと行{い}きますか。",
+          "side": "left"
+        },
+        {
+          "who": "花音{かのん}",
+          "text": "姉{あね}と行{い}きます。",
+          "side": "right"
+        }
+      ]
+    },
+    {
+      "template": "practice",
+      "cue": 30,
+      "until_cue": 31,
+      "title": "練習{れんしゅう}1",
+      "question": "バス＿＿学校{がっこう}へ行{い}きます。",
+      "options": [
+        "で",
+        "へ",
+        "と"
+      ],
+      "answer": 0,
+      "think": 5,
+      "explain": "バスは乗{の}り物{もの}：「で」"
+    },
+    {
+      "template": "practice",
+      "cue": 32,
+      "until_cue": 33,
+      "title": "練習{れんしゅう}2",
+      "question": "母{はは}＿＿デパートへ行{い}きます。",
+      "options": [
+        "へ",
+        "と",
+        "で"
+      ],
+      "answer": 1,
+      "think": 5,
+      "explain": "母{はは}と手{て}をつなぐ：「と」"
+    },
+    {
+      "template": "practice",
+      "cue": 34,
+      "until_cue": 35,
+      "title": "練習{れんしゅう}3",
+      "question": "来年{らいねん}、日本{にほん}＿＿行{い}きます。",
+      "options": [
+        "で",
+        "と",
+        "へ"
+      ],
+      "answer": 2,
+      "think": 5,
+      "explain": "日本{にほん}に向{む}かう矢印{やじるし}：「へ」"
+    },
+    {
+      "template": "dialogue",
+      "cue": 36,
+      "until_cue": 37,
+      "title": "まとめ",
+      "layout": "timeline",
+      "lines": [
+        {
+          "who": "へ",
+          "text": "矢印{やじるし}"
+        },
+        {
+          "who": "で",
+          "text": "車{くるま}"
+        },
+        {
+          "who": "と",
+          "text": "手{て}をつなぐ"
+        }
+      ],
+      "accent": "star"
+    }
+  ]
+}

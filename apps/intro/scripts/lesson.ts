@@ -10,6 +10,8 @@
 // cues the scenes point at, and its audio tells where the body starts.
 //   bun run lesson prompt  <x.project.json>                    the instructions + cues, for a model to write scenes
 //   bun run lesson check   <x.visuals.json> <x.project.json>   is the scenes file valid?
+//   (prompt and check also take the script, `x.script.vi.txt`, in place of the project:
+//    one cue per spoken line, so scenes can be written before the voice exists)
 //   bun run lesson whisper-setup                               fetches Whisper (once, ~150 MB)
 //   bun run lesson words   <x.project.json>                    when each token of the voice is said
 // --captions draws the subtitles into the picture, lit word by word.
@@ -26,6 +28,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { align, karaoke, type Heard } from "../src/lesson/karaoke.ts";
 import { planScenes } from "../src/lesson/plan.ts";
 import { buildPrompt } from "../src/lesson/prompt.ts";
+import { parseScript } from "../src/lesson/script.ts";
 import { validate } from "../src/lesson/validate.ts";
 import type { Cue, LessonProps, VisualsFile } from "../src/lesson/types.ts";
 
@@ -229,18 +232,31 @@ export function apply(projectPath: string, video: string): void {
   writeFileSync(projectPath, JSON.stringify(project, null, 2) + "\n", "utf8");
 }
 
+/** The cues of a project, or of a script not voiced yet (one per spoken line). */
+function cuesOf(path: string): { cues: Cue[]; title?: string; errors: string[]; warnings: string[] } {
+  if (/\.txt$/i.test(path)) {
+    const r = parseScript(readFileSync(resolve(path), "utf8"));
+    const cues = r.lines.map((l, i) => ({ start: i, end: i + 1, text: l.text, translation: l.translation }));
+    return { cues, errors: r.errors.map((e) => `script ${e}`), warnings: r.warnings.map((w) => `script ${w}`) };
+  }
+  const project = readJson<Project>(resolve(path));
+  return { cues: project.subtitles ?? [], title: typeof project.title === "string" ? project.title : undefined, errors: [], warnings: [] };
+}
+
 async function main() {
   const [cmd, a, b] = process.argv.slice(2);
   try {
     if (cmd === "prompt" && a) {
       // What to give a language model so it writes the visuals file (see opencut_scenes.py).
-      const project = readJson<Project>(resolve(a));
-      console.log(buildPrompt(project.subtitles ?? [], typeof project.title === "string" ? project.title : undefined));
+      const { cues, title } = cuesOf(a);
+      console.log(buildPrompt(cues, title));
     } else if (cmd === "check" && a && b) {
-      const project = readJson<Project>(resolve(b));
+      const { cues, errors: scriptErrors, warnings: scriptWarnings } = cuesOf(b);
       const dir = dirname(resolve(a));
       const found = (src: string) => existsSync(resolve(dir, src)) || existsSync(join(root, "public", src));
-      const { errors, warnings } = validate(readJson(resolve(a)), (project.subtitles ?? []).length, found);
+      const report = validate(readJson(resolve(a)), cues.length, found);
+      const errors = [...scriptErrors, ...report.errors];
+      const warnings = [...scriptWarnings, ...report.warnings];
       for (const w of warnings) console.log(`warning: ${w}`);
       for (const e of errors) console.log(`error: ${e}`);
       if (errors.length) process.exit(1);
