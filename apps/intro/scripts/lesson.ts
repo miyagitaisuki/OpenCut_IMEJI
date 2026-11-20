@@ -8,6 +8,8 @@
 //
 // The project is what `opencut import-textts` wrote: its subtitles are the
 // cues the scenes point at, and its audio tells where the body starts.
+//   bun run lesson prompt  <x.project.json>                    the instructions + cues, for a model to write scenes
+//   bun run lesson check   <x.visuals.json> <x.project.json>   is the scenes file valid?
 //   bun run lesson whisper-setup                               fetches Whisper (once, ~150 MB)
 //   bun run lesson words   <x.project.json>                    when each token of the voice is said
 // --captions draws the subtitles into the picture, lit word by word.
@@ -23,6 +25,8 @@ import { basename, dirname, join, resolve } from "node:path";
 
 import { align, karaoke, type Heard } from "../src/lesson/karaoke.ts";
 import { planScenes } from "../src/lesson/plan.ts";
+import { buildPrompt } from "../src/lesson/prompt.ts";
+import { validate } from "../src/lesson/validate.ts";
 import type { Cue, LessonProps, VisualsFile } from "../src/lesson/types.ts";
 
 const root = resolve(import.meta.dirname, "..");
@@ -228,7 +232,20 @@ export function apply(projectPath: string, video: string): void {
 async function main() {
   const [cmd, a, b] = process.argv.slice(2);
   try {
-    if (cmd === "whisper-setup") {
+    if (cmd === "prompt" && a) {
+      // What to give a language model so it writes the visuals file (see opencut_scenes.py).
+      const project = readJson<Project>(resolve(a));
+      console.log(buildPrompt(project.subtitles ?? [], typeof project.title === "string" ? project.title : undefined));
+    } else if (cmd === "check" && a && b) {
+      const project = readJson<Project>(resolve(b));
+      const dir = dirname(resolve(a));
+      const found = (src: string) => existsSync(resolve(dir, src)) || existsSync(join(root, "public", src));
+      const { errors, warnings } = validate(readJson(resolve(a)), (project.subtitles ?? []).length, found);
+      for (const w of warnings) console.log(`warning: ${w}`);
+      for (const e of errors) console.log(`error: ${e}`);
+      if (errors.length) process.exit(1);
+      console.log(`${a}: ok (${warnings.length} warnings)`);
+    } else if (cmd === "whisper-setup") {
       await whisperSetup();
     } else if (cmd === "words" && a) {
       console.log(words(resolve(a)));

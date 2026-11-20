@@ -266,7 +266,15 @@ def make_lesson(args: argparse.Namespace) -> dict:
     if args.visuals:
         # The body picture: Remotion scenes timed by the project's cues. Before the mascot,
         # which is drawn over it.
-        apply_visuals(project, args.visuals, karaoke=args.karaoke)
+        visuals = args.visuals
+        if visuals == "auto":
+            # Claude writes the scenes from the project's cues; look them over (and edit) before the next render.
+            import opencut_scenes
+            try:
+                visuals = str(opencut_scenes.generate(project, out / f"{name}.visuals.json"))
+            except opencut_scenes.ScenesError as error:
+                raise PtcError(f"auto scenes failed: {error}") from error
+        apply_visuals(project, visuals, karaoke=args.karaoke)
 
     if args.mascot:
         # After intro/outro, so poses sit on the final timeline: one per sentence.
@@ -322,7 +330,8 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--mascot", metavar="AVATAR_DIR",
                         help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/chibi)")
     lesson.add_argument("--visuals", metavar="VISUALS_JSON",
-                        help="Scenes for the body (charts, diagrams...), timed by cue: apps/intro/scenes/*.visuals.json")
+                        help="Scenes for the body (charts, diagrams...), timed by cue: apps/intro/scenes/*.visuals.json, "
+                             "or `auto` to have Claude write them (needs ANTHROPIC_API_KEY)")
     lesson.add_argument("--karaoke", action="store_true",
                         help="With --visuals: subtitles lit word by word at the voice's pace (needs `bun run lesson whisper-setup` once); "
                              "replaces --burn-subtitles, so intro/outro lines are not burned in")
