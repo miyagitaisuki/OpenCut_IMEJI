@@ -22,6 +22,18 @@ class Pronunciation(unittest.TestCase):
         self.assertEqual(lesson_qc.similarity(text, ""), 0.0)
 
 
+class EngineReadings(unittest.TestCase):
+    def test_sounds_alike_spellings_are_equal(self):
+        # particle は/へ and long vowels differ in spelling, not in sound
+        self.assertEqual(lesson_qc.kana_norm("せんせいは がっこうへ"), lesson_qc.kana_norm("センセエワ ガッコオエ"))
+        self.assertNotEqual(lesson_qc.kana_norm("みっつめ"), lesson_qc.kana_norm("ミツメ"))
+
+    def test_words_to_teach_are_whole_words(self):
+        self.assertEqual(lesson_qc.word_candidates("三{みっ}つ目{め}は「と」です。"), [("三つ目", "みっつめ")])
+        self.assertEqual(lesson_qc.word_candidates("図書館{としょかん}へ行{い}きます。"), [("図書館", "としょかん")])
+        self.assertEqual(lesson_qc.word_candidates("行{い}きます。"), [])  # a stem, not a word
+
+
 class Layout(unittest.TestCase):
     def test_dark_text_outside_the_safe_area_is_reported(self):
         from PIL import Image, ImageDraw

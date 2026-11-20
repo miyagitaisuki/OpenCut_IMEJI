@@ -2,6 +2,7 @@
 """Checks on a lesson before it is published (standard library + Pillow for `layout`).
 
   python scripts/lesson_qc.py pron   <x.project.json> [--words x.words.json] [--fix]
+  python scripts/lesson_qc.py engine <x.project.json> [--voices scripts/lesson_voices.json]
   python scripts/lesson_qc.py layout <folder-of-scene-stills> [--safe L,T,R,B]
   python scripts/lesson_qc.py video  <x.mp4> [--short]
 
@@ -10,6 +11,9 @@ pron    Compares what Whisper heard (`node apps/intro/scripts/lesson.ts words`) 
         misread a kanji. `--fix` adds the line's furigana words (`漢字{かな}`) to textts'
         reading dictionary (POST /api/v1/readings), so a re-voice reads them as written.
         Whisper (base model) also mishears, so a suspect is a place to listen, not proof.
+engine  Asks AivisSpeech how it will read each line (`/audio_query`: the moras it will say) and compares
+        that with the furigana. Exact, unlike Whisper: a line is a suspect only if the engine reads it
+        differently from what the script says (particles は/へ/を and long vowels are allowed for).
 layout  Looks at scene stills (`lesson.ts preview`): dark text outside the safe area means
         a scene overflowed (the subtitles and the chibi use the rest of the screen).
 video   ffprobe: size, codec, length, loudness (-16 LUFS target).
@@ -32,7 +36,7 @@ from pathlib import Path
 
 TEXTTS_URL = os.environ.get("TEXTTS_URL", "http://127.0.0.1:8000").rstrip("/")
 RUBY = re.compile(r"([一-鿿々]+)\{([^}]+)\}")
-PUNCT = re.compile(r"[\s、。，．,.!?！？「」『』（）()・\-ー〜~]+")
+PUNCT = re.compile(r"[\s、。，．,.!?！？「」『』（）()・\-ー〜~'\"]+")
 THRESHOLD = 0.55
 
 
@@ -78,24 +82,96 @@ def pron(project_path: Path, words_path: Path | None, fix: bool) -> int:
     for i, score, text, said in suspects:
         print(f"  line {i}: {score:.2f}  written: {surface(text)}  |  heard: {said or '(nothing)'}")
     if fix and suspects:
-        added = []
-        for _, _, text, _ in suspects:
-            for kanji, kana in RUBY.findall(text):
-                # A single kanji with okurigana (行{い}きます) is a stem, not a word: a dictionary entry for it
-                # would be applied inside other words. Only whole words of two or more kanji are added.
-                if len(kanji) >= 2:
-                    added.append((kanji, kana))
-        done = []
-        for kanji, kana in dict.fromkeys(added):
-            try:
-                req = urllib.request.Request(f"{TEXTTS_URL}/api/v1/readings", method="POST",
-                                             data=json.dumps({"word": kanji, "reading": kana}).encode("utf-8"),
-                                             headers={"Content-Type": "application/json"})
-                urllib.request.urlopen(req, timeout=20).read()
-                done.append(f"{kanji}={kana}")
-            except Exception as error:  # noqa: BLE001
-                print(f"  could not add {kanji}={kana}: {error}", file=sys.stderr)
+        # A single kanji with okurigana (行{い}きます) is a stem, not a word: an entry for it would be
+        # applied inside other words. Only words of two or more kanji are added.
+        done = add_readings([pair for _, _, text, _ in suspects for pair in word_candidates(text)], TEXTTS_URL)
         print(f"added to textts' reading dictionary: {', '.join(done) or 'nothing'}; voice the lesson again to apply them")
+    return 1 if suspects else 0
+
+
+def kana_norm(text: str) -> str:
+    """Hiragana -> katakana, minus punctuation, with the spellings that sound alike made equal
+    (particle は/へ/を, long vowels)."""
+    out = "".join(chr(ord(c) + 0x60) if "ぁ" <= c <= "ゖ" else c for c in PUNCT.sub("", unicodedata.normalize("NFKC", text)))
+    for a, b in (("ヘ", "エ"), ("ハ", "ワ"), ("ヲ", "オ"), ("ー", "")):
+        out = out.replace(a, b)
+    # long vowels: ...エイ / ...オウ are spoken エー / オー
+    return re.sub(r"([エケセテネメレゲゼデベペ])イ", r"\1エ", re.sub(r"([オコソトノモヨロゴゾドボポョ])ウ", r"\1オ", out))
+
+
+# A word made of kanji (with okurigana between them): 三{みっ}つ目{め} -> 三つ目 / みっつめ.
+SEGMENT = re.compile(r"(?:[一-鿿々]+\{[^}]+\}(?:(?![はがをにでとものへや])[ぁ-ん]{1,2}(?=[一-鿿々]+\{))?)+")
+
+
+def word_candidates(text: str) -> list[tuple[str, str]]:
+    """Words of a furigana line to teach textts: two or more kanji, or kanji joined by okurigana."""
+    out = []
+    for m in SEGMENT.finditer(text):
+        seg = m.group(0)
+        word, kana = surface(seg), reading(seg)
+        if len(re.sub(r"[ぁ-ん]", "", word)) >= 2:
+            out.append((word, kana))
+    return out
+
+
+def textts_readings(url: str) -> dict[str, str]:
+    try:
+        return json.load(urllib.request.urlopen(f"{url}/api/v1/readings", timeout=15)).get("readings", {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def add_readings(pairs: list[tuple[str, str]], url: str) -> list[str]:
+    done = []
+    for word, kana in dict.fromkeys(pairs):
+        try:
+            req = urllib.request.Request(f"{url}/api/v1/readings", method="POST",
+                                         data=json.dumps({"word": word, "reading": kana}).encode("utf-8"),
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=20).read()
+            done.append(f"{word}={kana}")
+        except Exception as error:  # noqa: BLE001
+            print(f"  could not add {word}={kana}: {error}", file=sys.stderr)
+    return done
+
+
+def engine(project_path: Path, voices_path: Path, url: str, fix: bool = False) -> int:
+    """Per line: the moras AivisSpeech will say vs the furigana of the script (textts' readings applied first)."""
+    import urllib.parse  # noqa: PLC0415
+
+    known = textts_readings(TEXTTS_URL)
+
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    voices = json.loads(voices_path.read_text(encoding="utf-8")) if voices_path.exists() else {}
+    suspects = []
+    cues = project.get("subtitles", [])
+    for i, cue in enumerate(cues):
+        voice = (voices.get(str(cue.get("role", "1"))) or voices.get("1") or {}).get("voice")
+        if not voice:
+            continue
+        spoken = surface(cue["text"])
+        for word in sorted(known, key=len, reverse=True):
+            spoken = spoken.replace(word, known[word])
+        req = urllib.request.Request(f"{url}/audio_query?" + urllib.parse.urlencode({"text": spoken, "speaker": voice}), method="POST")
+        try:
+            query = json.load(urllib.request.urlopen(req, timeout=30))
+        except Exception as error:  # noqa: BLE001
+            print(f"error: AivisSpeech at {url}: {error}", file=sys.stderr)
+            return 2
+        said = "".join(m["text"] for ap in query["accent_phrases"] for m in ap["moras"])
+        want = reading(cue["text"])
+        for word in sorted(known, key=len, reverse=True):  # Latin words (QBank) are taught to textts in kana
+            want = want.replace(word, known[word])
+        score = difflib.SequenceMatcher(None, kana_norm(want), kana_norm(said)).ratio()
+        if score < 0.85:
+            suspects.append((i, score, want, said))
+    print(f"{len(cues) - len(suspects)}/{len(cues)} lines are read by the engine as the furigana says")
+    for i, score, want, said in suspects:
+        print(f"  line {i}: {score:.2f}  furigana: {want}  |  engine says: {said}")
+    if fix and suspects:
+        pairs = [pair for i, *_ in suspects for pair in word_candidates(cues[i]["text"])]
+        added = add_readings(pairs, TEXTTS_URL)
+        print(f"added to textts' reading dictionary: {', '.join(added) or 'nothing'}; run the check again, then voice the lesson again")
     return 1 if suspects else 0
 
 
@@ -166,6 +242,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("project")
     p.add_argument("--words")
     p.add_argument("--fix", action="store_true")
+    e = sub.add_parser("engine")
+    e.add_argument("project")
+    e.add_argument("--voices", default=str(Path(__file__).resolve().parent / "lesson_voices.json"))
+    e.add_argument("--fix", action="store_true", help="teach textts the readings of the suspect lines' words")
+    e.add_argument("--url", default=os.environ.get("AIVIS_URL", "http://127.0.0.1:10101"))
     la = sub.add_parser("layout")
     la.add_argument("folder")
     la.add_argument("--safe", default="90,40,1830,540", help="left,top,right,bottom in pixels")
@@ -175,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "pron":
         return pron(Path(args.project), Path(args.words) if args.words else None, args.fix)
+    if args.command == "engine":
+        return engine(Path(args.project), Path(args.voices), args.url.rstrip("/"), args.fix)
     if args.command == "layout":
         return layout(Path(args.folder), tuple(int(n) for n in args.safe.split(",")))  # type: ignore[arg-type]
     if args.short:
