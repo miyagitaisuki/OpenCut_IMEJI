@@ -33,6 +33,10 @@ BGM = ASSETS / "bgm" / "soft-pad.wav"
 CHIME = ASSETS / "sfx" / "chime.wav"
 WHOOSH = ASSETS / "sfx" / "whoosh.wav"
 LUFS = -16.0
+# The music chain, shared with scripts/measure_ducking.py: every track lands at the same level, then the voice
+# (the key) pulls it down while someone speaks.
+MUSIC_FILTER = "loudnorm=I=-30:TP=-3:LRA=7,volume={music_db}dB"
+DUCK_FILTER = "sidechaincompress=threshold=0.02:ratio=8:attack=20:release=600:makeup=1"
 
 
 class AudioError(RuntimeError):
@@ -117,8 +121,8 @@ def mix(video: Path, out: Path, bgm: Path | None, markers: Path | None, music_db
     parts = [
         # voice twice: one copy goes to the mix, one steers the compressor
         "[0:a]asplit=2[voice][key]",
-        f"[1:a]loudnorm=I=-30:TP=-3:LRA=7,volume={music_db}dB[music]",  # any track lands at the same level
-        "[music][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=600:makeup=1[ducked]",
+        f"[1:a]{MUSIC_FILTER.format(music_db=music_db)}[music]",
+        f"[music][key]{DUCK_FILTER}[ducked]",
     ]
     layers = ["[voice]", "[ducked]"]
     if times:
