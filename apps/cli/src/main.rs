@@ -93,6 +93,23 @@ enum Command {
         #[arg(long)]
         background: Option<String>,
     },
+    /// Put a chibi mascot in a corner of the lesson, changing pose with each
+    /// sentence (poses picked from the subtitles). Run it after intro/outro are added.
+    Mascot {
+        project: PathBuf,
+        /// Avatar folder with `avatar.json` and a `poses` map (apps/intro/public/avatars/chibi).
+        #[arg(long)]
+        avatar: Option<PathBuf>,
+        /// bottom-right (default) or bottom-left.
+        #[arg(long)]
+        corner: Option<String>,
+        /// Height as a fraction of the picture (default 0.55).
+        #[arg(long)]
+        height: Option<f64>,
+        /// Take the mascot out of the project.
+        #[arg(long)]
+        remove: bool,
+    },
     /// List what would stop a project from rendering.
     Check { project: PathBuf },
     /// Render a project to a video, with .vtt/.srt subtitles and .markers.json beside it.
@@ -189,6 +206,16 @@ fn main() -> Result<()> {
                 fps,
                 background,
             })?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::Mascot {
+            project,
+            avatar,
+            corner,
+            height,
+            remove,
+        } => {
+            let result = lesson::set_mascot(&project, avatar, corner.as_deref(), height, remove)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::Check { project } => {

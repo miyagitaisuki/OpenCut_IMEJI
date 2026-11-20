@@ -1,0 +1,33 @@
+{
+  "name": "chibi",
+  "size": [
+    1432,
+    2000
+  ],
+  "poses": {
+    "think_chin": "pose_a01.png",
+    "present_side": "pose_a02.png",
+    "hand_ear_smile": "pose_a03.png",
+    "hold_mic": "pose_a04.png",
+    "ask_finger_chin": "pose_a05.png",
+    "arms_crossed": "pose_a06.png",
+    "scratch_head": "pose_a07.png",
+    "idea_finger_up": "pose_a08.png",
+    "shrug_open_palms": "pose_a09.png",
+    "hold_phone": "pose_a10.png",
+    "hold_item_point": "pose_a11.png",
+    "read_book": "pose_a12.png",
+    "wave": "pose_b01.png",
+    "bow_eyes_closed": "pose_b02.png",
+    "cheer_arms_up": "pose_b03.png",
+    "hand_chest": "pose_b04.png",
+    "present_left": "pose_b05.png",
+    "finger_up_talk": "pose_b06.png",
+    "peace_sign": "pose_b07.png",
+    "point_right": "pose_b08.png",
+    "one_finger_up": "pose_b09.png",
+    "present_open": "pose_b10.png",
+    "hand_chest_tilt": "pose_b11.png",
+    "point_left": "pose_b12.png"
+  }
+}

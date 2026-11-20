@@ -146,14 +146,15 @@ fn units(text: &str) -> Vec<Unit> {
     out
 }
 
-/// Lays a cue out and draws it on a transparent picture as wide as the
-/// video at most. Returns `None` for a cue with no text.
-pub fn render_cue(cue: &Cue, fonts: &Fonts, video_width: u32, video_height: u32) -> Option<Frame> {
+/// Lays a cue out and draws it on a transparent picture no wider than
+/// `area_width` (the video's width, less any corner a mascot takes). Returns
+/// `None` for a cue with no text.
+pub fn render_cue(cue: &Cue, fonts: &Fonts, area_width: u32, video_height: u32) -> Option<Frame> {
     let main = (video_height as f32 * 0.052).max(14.0);
     let small = main * 0.5;
     let tr_size = main * 0.68;
     let pad = main * 0.55;
-    let max_width = video_width as f32 * 0.86 - pad * 2.0;
+    let max_width = area_width as f32 * 0.86 - pad * 2.0;
 
     // Japanese lines, broken between units.
     let mut lines: Vec<Vec<Unit>> = vec![Vec::new()];

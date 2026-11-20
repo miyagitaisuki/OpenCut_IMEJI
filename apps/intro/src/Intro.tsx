@@ -41,7 +41,15 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
           transform: `translateY(${(1 - enter) * 400}px)`,
         }}
       >
-        {avatar.live2d ? (
+        {avatar.poses ? (
+          <PoseAvatar
+            avatar={avatar}
+            frame={frame}
+            fps={fps}
+            gesture={gestureTimeline(scene.gestures, talking, LEAD_IN, fps)}
+            speaking={talking > 0 && talking < voiceSeconds}
+          />
+        ) : avatar.live2d ? (
           <Live2dAvatar
             folder={avatar.folder}
             config={avatar.live2d}
@@ -113,6 +121,49 @@ type GestureState = {
   previous?: string;
   /** Video frame the current gesture began on. */
   startFrame: number;
+};
+
+/** A whole-picture pose per sentence: crossfade with a small hop, a slow sway and a breath. */
+const PoseAvatar: React.FC<{
+  avatar: IntroProps["avatar"];
+  frame: number;
+  fps: number;
+  gesture: GestureState;
+  speaking: boolean;
+}> = ({ avatar, frame, fps, gesture, speaking }) => {
+  const poses = avatar.poses ?? {};
+  const [w, h] = avatar.size;
+  const scale = 1040 / h;
+  const base = `avatars/${avatar.folder}/`;
+  const first = Object.values(poses)[0];
+  const current = poses[gesture.current ?? ""] ?? first;
+  const previous = gesture.previous ? poses[gesture.previous] : undefined;
+  const since = frame - gesture.startFrame;
+  const fade = previous ? Math.min(1, Math.max(0, since / 4)) : 1;
+  const hop = previous ? Math.max(0, 1 - since / 10) * -16 * Math.sin((Math.min(since, 10) / 10) * Math.PI) : 0;
+  const sway = Math.sin(frame / 34) * 1.2;
+  const breath = 1 + Math.sin(frame / 20) * 0.006 + (speaking ? Math.sin(frame / 5) * 0.003 : 0);
+  const pic = (file: string, opacity: number) => (
+    <Img
+      key={file}
+      src={staticFile(base + file)}
+      style={{ position: "absolute", left: 0, top: 0, width: w * scale, height: h * scale, opacity }}
+    />
+  );
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: w * scale,
+        height: h * scale,
+        transformOrigin: "50% 100%",
+        transform: `translateY(${hop}px) rotate(${sway}deg) scaleY(${breath})`,
+      }}
+    >
+      {previous && fade < 1 && pic(previous, 1)}
+      {pic(current, fade)}
+    </div>
+  );
 };
 
 const Avatar: React.FC<{

@@ -32,6 +32,21 @@ struct ProbeParams {
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
+struct MascotParams {
+    /// Path of the project.json.
+    project: PathBuf,
+    /// Avatar folder with avatar.json and a `poses` map (e.g. apps/intro/public/avatars/chibi). Needed the first time.
+    avatar: Option<PathBuf>,
+    /// bottom-right (default) or bottom-left.
+    corner: Option<String>,
+    /// Height as a fraction of the picture (default 0.55).
+    height: Option<f64>,
+    /// Take the mascot out of the project.
+    remove: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
 struct FrameParams {
     /// Path of the video file.
     path: PathBuf,
@@ -140,6 +155,28 @@ impl OpenCut {
     ) -> Result<CallToolResult, ErrorData> {
         respond(json(
             blocking(move || crate::lesson::import(&request).map_err(chain)).await,
+        ))
+    }
+
+    #[tool(
+        description = "Put a chibi mascot in a corner of a lesson project, changing pose with each subtitle sentence (poses picked from what is said: greeting, question, praise, thanks...). Run it after import_textts (and after any intro/outro, which shift the timeline), then render_project. Burned-in subtitles keep clear of her. Returns how many poses were set."
+    )]
+    async fn set_mascot(
+        &self,
+        Parameters(params): Parameters<MascotParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                crate::lesson::set_mascot(
+                    &params.project,
+                    params.avatar,
+                    params.corner.as_deref(),
+                    params.height,
+                    params.remove.unwrap_or(false),
+                )
+                .map_err(chain)
+            })
+            .await,
         ))
     }
 
@@ -261,7 +298,7 @@ impl OpenCut {
 #[tool_handler(
     router = self.tool_router,
     name = "opencut",
-    instructions = "OpenCut: media tools and lesson video rendering. Paths are on the machine running the server; times are in seconds. To make a lesson video from textts output: import_textts, then check_project, then render_project. probe_media, extract_frame and generate_thumbnails inspect any video, including a rendered one."
+    instructions = "OpenCut: media tools and lesson video rendering. Paths are on the machine running the server; times are in seconds. To make a lesson video from textts output: import_textts, then optionally set_mascot (a chibi in the corner posing per sentence), then check_project, then render_project. probe_media, extract_frame and generate_thumbnails inspect any video, including a rendered one."
 )]
 impl ServerHandler for OpenCut {}
 
