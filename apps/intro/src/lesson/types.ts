@@ -96,6 +96,14 @@ export type LessonProps = {
   segments: Segment[];
   /** Length of the body video in seconds. */
   duration: number;
+  /** Subtitles drawn word by word (karaoke) in the picture. Absent: none. */
+  captions?: KaraokeCue[];
 };
 
 export type Cue = { start: number; end: number; text: string; translation?: string };
+
+/** A piece of a subtitle that lights up as one: a kanji word with its reading, or a character. */
+export type Unit = { base: string; reading?: string; start: number; end: number };
+
+/** A subtitle with the time each unit is spoken, in seconds from the start of the body. */
+export type KaraokeCue = { start: number; end: number; units: Unit[]; translation?: string };

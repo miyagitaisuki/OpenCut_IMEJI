@@ -195,7 +195,7 @@ def run(cmd: list[str]) -> None:
         raise PtcError(f"{' '.join(cmd[:3])} failed:\n{done.stderr.strip() or done.stdout.strip()}")
 
 
-def apply_visuals(project: Path, visuals: str) -> None:
+def apply_visuals(project: Path, visuals: str, karaoke: bool = False) -> None:
     """Renders the lesson's scenes (apps/intro `lesson build`) and makes them the project's picture."""
     node = shutil.which("node")
     if not node:
@@ -266,7 +266,7 @@ def make_lesson(args: argparse.Namespace) -> dict:
     if args.visuals:
         # The body picture: Remotion scenes timed by the project's cues. Before the mascot,
         # which is drawn over it.
-        apply_visuals(project, args.visuals)
+        apply_visuals(project, args.visuals, karaoke=args.karaoke)
 
     if args.mascot:
         # After intro/outro, so poses sit on the final timeline: one per sentence.
@@ -279,7 +279,8 @@ def make_lesson(args: argparse.Namespace) -> dict:
     if args.render:
         video = out / f"{name}.mp4"
         cmd = [opencut, "render", str(project), "-o", str(video)]
-        if args.burn_subtitles:
+        # --karaoke draws the subtitles itself; burning them in again would double them.
+        if args.burn_subtitles and not (args.visuals and args.karaoke):
             cmd.append("--burn-subtitles")
         run(cmd)
     return {"project": str(project), "video": str(video) if video else None,
@@ -322,6 +323,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/chibi)")
     lesson.add_argument("--visuals", metavar="VISUALS_JSON",
                         help="Scenes for the body (charts, diagrams...), timed by cue: apps/intro/scenes/*.visuals.json")
+    lesson.add_argument("--karaoke", action="store_true",
+                        help="With --visuals: subtitles lit word by word at the voice's pace (needs `bun run lesson whisper-setup` once); "
+                             "replaces --burn-subtitles, so intro/outro lines are not burned in")
     lesson.add_argument("--render", action="store_true", help="Also render the video")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")
