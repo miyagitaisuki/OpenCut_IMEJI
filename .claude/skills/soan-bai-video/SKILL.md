@@ -25,6 +25,7 @@ Hỏi số bài Minna (hoặc chủ đề), cấp độ (mặc định N5 với 
 ## 3. Quy tắc nội dung
 - Lời giảng **toàn tiếng Nhật**, đúng trình độ: N5 dùng thể です/ます, câu ngắn ≤ 40 ký tự, chỉ dùng từ đã học tới bài đó; giải thích ngữ pháp bằng câu đơn giản.
 - **Giải thích dễ hiểu cho người chưa biết gì**: mỗi mẫu ngữ pháp có **một phép ví von sinh động, gần đời sống** (vd. trợ từ へ là "mũi tên chỉ hướng", で là "chiếc xe chở hành động", と là "nắm tay đi cùng"), nói bằng tiếng Nhật dễ, rồi minh họa ngay bằng cảnh (`grammar` có `note` nhắc lại ví von, hoặc `image`/`compare`). Không dùng thuật ngữ ngữ pháp khi chưa giải thích; đi từ ví dụ → quy tắc, không đi ngược lại. Mỗi ý chỉ một bước nhỏ, nhắc lại ví von ở phần tổng kết.
+- **Chữ trên slide**: phần giải thích (tiêu đề cảnh, `label`, `note`, `explain`, tiêu đề cột `compare`, `subtitle`) viết **tiếng Việt**, ngắn; phần **ví dụ, mẫu câu, từ vựng, câu hỏi và lựa chọn luyện tập** giữ **tiếng Nhật** có furigana. Lời đọc (kịch bản) vẫn toàn tiếng Nhật.
 - **Furigana cho mọi chữ Hán** theo cú pháp textts `漢字{かんじ}`, kể cả trong `visuals.json`.
 - **Câu ví dụ tự viết**, không chép nguyên văn hội thoại, bài tập hay ví dụ trong sách Minna (bản quyền). Được dùng tên mẫu ngữ pháp và từ vựng của bài.
 - Vai (giọng textts cố định): `[1]` **まい** (giáo viên, lời giảng), `[2]` **fumifumi** (học sinh nam), `[3]` **花音** (học sinh nữ). Hội thoại mẫu dùng `[2]`/`[3]`; trong cảnh `dialogue`, `who` ghi tên vai (ふみ, 花音{かのん}).

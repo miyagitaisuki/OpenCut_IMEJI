@@ -5,26 +5,26 @@
       "cue": 0,
       "until_cue": 1,
       "title": "第{だい}5課{か}",
-      "subtitle": "どこへ・何{なに}で・だれと",
+      "subtitle": "Đi đâu · bằng gì · với ai",
       "badge": "N5"
     },
     {
       "template": "compare",
       "cue": 3,
       "until_cue": 6,
-      "title": "動{うご}く方向{ほうこう}",
+      "title": "Hướng di chuyển",
       "left": {
-        "title": "行{い}きます",
+        "title": "行{い}きます: đi",
         "items": [
-          "ここ → 向{む}こう",
+          "Từ đây → ra kia",
           "図書館{としょかん}へ行{い}きます"
         ],
         "tone": "pink"
       },
       "right": {
-        "title": "来{き}ます・帰{かえ}ります",
+        "title": "来{き}ます / 帰{かえ}ります",
         "items": [
-          "向{む}こう → ここ",
+          "Từ kia → về đây",
           "家{いえ}へ帰{かえ}ります"
         ],
         "tone": "sky"
@@ -34,15 +34,15 @@
       "template": "grammar",
       "cue": 8,
       "until_cue": 11,
-      "title": "「へ」は矢印{やじるし}",
+      "title": "「へ」 = mũi tên chỉ hướng",
       "parts": [
         {
           "text": "場所{ばしょ}",
-          "label": "どこ"
+          "label": "nơi chốn"
         },
         {
           "text": "へ",
-          "label": "→ 矢印{やじるし}",
+          "label": "→ mũi tên",
           "tone": "pink"
         },
         {
@@ -53,21 +53,21 @@
       "result": {
         "text": "図書館{としょかん}へ行{い}きます"
       },
-      "note": "行{い}く方向{ほうこう}を指{さ}す矢印{やじるし}"
+      "note": "へ chỉ hướng mình đi tới"
     },
     {
       "template": "grammar",
       "cue": 12,
       "until_cue": 15,
-      "title": "「で」は車{くるま}",
+      "title": "「で」 = chiếc xe chở bạn",
       "parts": [
         {
           "text": "乗{の}り物{もの}",
-          "label": "何{なに}で"
+          "label": "phương tiện"
         },
         {
           "text": "で",
-          "label": "運{はこ}ぶ車{くるま}",
+          "label": "chiếc xe",
           "tone": "sun"
         },
         {
@@ -78,21 +78,21 @@
       "result": {
         "text": "電車{でんしゃ}で行{い}きます"
       },
-      "note": "歩{ある}くときは「歩{ある}いて」"
+      "note": "Đi bộ thì nói 歩{ある}いて, không dùng で"
     },
     {
       "template": "grammar",
       "cue": 16,
       "until_cue": 19,
-      "title": "「と」は手{て}をつなぐ",
+      "title": "「と」 = nắm tay đi cùng",
       "parts": [
         {
           "text": "人{ひと}",
-          "label": "だれと"
+          "label": "người"
         },
         {
           "text": "と",
-          "label": "手{て}をつなぐ",
+          "label": "nắm tay",
           "tone": "mint"
         },
         {
@@ -103,24 +103,27 @@
       "result": {
         "text": "友達{ともだち}と行{い}きます"
       },
-      "note": "一人{ひとり}のときは「一人{ひとり}で」"
+      "note": "Đi một mình: 一人{ひとり}で (không có と)"
     },
     {
       "template": "grammar",
       "cue": 20,
       "until_cue": 21,
-      "title": "全部{ぜんぶ}つなげる",
+      "title": "Ghép cả ba",
       "parts": [
         {
           "text": "友達{ともだち}と",
+          "label": "với ai",
           "tone": "mint"
         },
         {
           "text": "電車{でんしゃ}で",
+          "label": "bằng gì",
           "tone": "sun"
         },
         {
           "text": "京都{きょうと}へ",
+          "label": "đi đâu",
           "tone": "pink"
         },
         {
@@ -134,7 +137,7 @@
       "template": "dialogue",
       "cue": 22,
       "until_cue": 26,
-      "title": "会話{かいわ}",
+      "title": "Hội thoại",
       "layout": "bubbles",
       "lines": [
         {
@@ -163,7 +166,7 @@
       "template": "dialogue",
       "cue": 27,
       "until_cue": 28,
-      "title": "会話{かいわ}",
+      "title": "Hội thoại",
       "layout": "bubbles",
       "lines": [
         {
@@ -182,7 +185,7 @@
       "template": "practice",
       "cue": 30,
       "until_cue": 31,
-      "title": "練習{れんしゅう}1",
+      "title": "Luyện tập 1",
       "question": "バス＿＿学校{がっこう}へ行{い}きます。",
       "options": [
         "で",
@@ -191,13 +194,13 @@
       ],
       "answer": 0,
       "think": 5,
-      "explain": "バスは乗{の}り物{もの}：「で」"
+      "explain": "Xe buýt là phương tiện → で"
     },
     {
       "template": "practice",
       "cue": 32,
       "until_cue": 33,
-      "title": "練習{れんしゅう}2",
+      "title": "Luyện tập 2",
       "question": "母{はは}＿＿デパートへ行{い}きます。",
       "options": [
         "へ",
@@ -206,13 +209,13 @@
       ],
       "answer": 1,
       "think": 5,
-      "explain": "母{はは}と手{て}をつなぐ：「と」"
+      "explain": "Nắm tay mẹ cùng đi → と"
     },
     {
       "template": "practice",
       "cue": 34,
       "until_cue": 35,
-      "title": "練習{れんしゅう}3",
+      "title": "Luyện tập 3",
       "question": "来年{らいねん}、日本{にほん}＿＿行{い}きます。",
       "options": [
         "で",
@@ -221,26 +224,26 @@
       ],
       "answer": 2,
       "think": 5,
-      "explain": "日本{にほん}に向{む}かう矢印{やじるし}：「へ」"
+      "explain": "Mũi tên hướng về Nhật → へ"
     },
     {
       "template": "dialogue",
       "cue": 36,
       "until_cue": 37,
-      "title": "まとめ",
+      "title": "Tổng kết",
       "layout": "timeline",
       "lines": [
         {
           "who": "へ",
-          "text": "矢印{やじるし}"
+          "text": "mũi tên"
         },
         {
           "who": "で",
-          "text": "車{くるま}"
+          "text": "chiếc xe"
         },
         {
           "who": "と",
-          "text": "手{て}をつなぐ"
+          "text": "nắm tay"
         }
       ],
       "accent": "star"

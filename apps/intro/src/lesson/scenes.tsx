@@ -356,7 +356,7 @@ export const Dialogue: React.FC<P<DialogueScene>> = ({ scene, duration }) => {
                       boxShadow: SHADOW,
                     }}
                   >
-                    {l.who}
+                    <Jp text={l.who} />
                   </div>
                 ) : null}
                 <div
