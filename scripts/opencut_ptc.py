@@ -31,6 +31,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -305,6 +306,45 @@ def textts_check_audio(script: str, roles: dict | None, threshold: float) -> dic
     return http_json("POST", f"{TEXTTS_URL}/api/v1/check-audio", body, timeout=900)
 
 
+def _line_key(line: str, roles: dict | None, level: str | None, threshold: float, readings: dict[str, str]) -> str:
+    """Cache key of one line's listen-back result. The readings count only when they occur in the line:
+    teaching a reading changes the lines that contain its word, not the whole lesson."""
+    relevant = {k: v for k, v in sorted(readings.items()) if k in line}
+    raw = json.dumps([line, roles, level, threshold, relevant], ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def textts_check_cached(script: str, roles: dict | None, level: str | None, threshold: float, cache_path: Path) -> dict:
+    """The listen-back check (textts `check-audio`) with a per-line cache in cache_path: only the spoken lines
+    whose key is new are sent to textts; the rest reuse their earlier result. The result has the same shape
+    as textts_check_audio(script, ...)."""
+    lines = [l.rstrip() for l in script.splitlines() if _is_speech(l)]
+    readings = lesson_qc.textts_readings(TEXTTS_URL)
+    keys = [_line_key(l, roles, level, threshold, readings) for l in lines]
+    cache: dict = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
+    missing = [i for i, k in enumerate(keys) if k not in cache]
+    if missing:
+        fresh = textts_check_audio("\n".join(lines[i] for i in missing) + "\n", roles, threshold)
+        found = fresh.get("results", [])
+        if len(found) == len(missing):
+            for i, r in zip(missing, found):
+                cache[keys[i]] = r
+        else:  # textts counted the lines differently: check the whole script and keep what it says
+            full = textts_check_audio(script, roles, threshold).get("results", [])
+            if len(full) != len(lines):
+                raise PtcError(f"textts checked {len(full)} lines, the script has {len(lines)}")
+            for k, r in zip(keys, full):
+                cache[k] = r
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cache_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({k: cache[k] for k in keys}, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(cache_path)
+    results = [cache[k] for k in keys]
+    suspicious = [r for r in results if not r.get("ok")]
+    return {"ok": not suspicious, "checked": len(results), "results": results, "suspicious": suspicious,
+            "cached": len(keys) - len(missing), "sent": len(missing)}
+
+
 def textts_preview(script: str) -> list[dict]:
     """textts' own furigana suggestions per line (`items[]` with `display`, `annotated`, `reading`)."""
     return http_json("POST", f"{TEXTTS_URL}/api/v1/preview-script", {"script": script}, timeout=120).get("items", [])
@@ -326,7 +366,7 @@ def voice_with_qc(script: str, roles: dict | None, args: argparse.Namespace, tit
     result: dict = {}
     for attempt in range(1, attempts + 1):
         result = textts_dialogue(title, name, script, roles, args.level)
-        qc = textts_check_audio(script, roles, args.qc_threshold)
+        qc = textts_check_cached(script, roles, args.level, args.qc_threshold, Path(args.out) / f"{name}.qc-lines.json")
         suspects = [r for r in qc.get("results", []) if not r.get("ok")]
         entry = {"attempt": attempt, "checked": qc.get("checked"),
                  "suspicious": [{"id": r.get("id"), "display": r.get("display"), "heard": r.get("heard"),
