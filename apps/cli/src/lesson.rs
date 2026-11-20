@@ -214,3 +214,73 @@ fn parent(path: &Path) -> PathBuf {
         _ => PathBuf::from("."),
     }
 }
+
+#[derive(Debug, Serialize)]
+pub(crate) struct MascotResult {
+    pub project: PathBuf,
+    /// Poses set, one per subtitle cue; 0 when the mascot was removed.
+    pub poses: usize,
+}
+
+/// Adds (or updates, or removes) the corner mascot and picks a pose per cue.
+pub(crate) fn set_mascot(
+    project_path: &Path,
+    avatar: Option<PathBuf>,
+    corner: Option<&str>,
+    height: Option<f64>,
+    remove: bool,
+) -> Result<MascotResult> {
+    let mut project = Project::load(project_path)?;
+    let base = project_path.parent().unwrap_or(Path::new("."));
+    if remove {
+        project.mascot = None;
+        project.save(project_path)?;
+        return Ok(MascotResult {
+            project: project_path.to_owned(),
+            poses: 0,
+        });
+    }
+    if let Some(avatar) = avatar {
+        // Stored relative to the project when it lies beneath it, else as given.
+        let avatar =
+            plain(std::fs::canonicalize(&avatar).with_context(|| format!("{}", avatar.display()))?);
+        let base_abs = plain(std::fs::canonicalize(base)?);
+        let stored = avatar
+            .strip_prefix(&base_abs)
+            .map(Path::to_path_buf)
+            .unwrap_or(avatar);
+        let mut mascot = project
+            .mascot
+            .take()
+            .unwrap_or_else(|| opencut_project::Mascot::new(stored.clone()));
+        mascot.avatar = stored;
+        project.mascot = Some(mascot);
+    }
+    let Some(mascot) = project.mascot.as_mut() else {
+        bail!("no mascot in the project yet: pass --avatar <folder>");
+    };
+    match corner {
+        Some("bottom-right") => mascot.corner = opencut_project::Corner::BottomRight,
+        Some("bottom-left") => mascot.corner = opencut_project::Corner::BottomLeft,
+        Some(other) => bail!("--corner: expected bottom-right or bottom-left, got {other:?}"),
+        None => {}
+    }
+    if let Some(height) = height {
+        mascot.height = height;
+    }
+    let poses = opencut_project::assign_poses(&mut project, base)?;
+    project.save(project_path)?;
+    Ok(MascotResult {
+        project: project_path.to_owned(),
+        poses,
+    })
+}
+
+/// Windows' verbatim prefix (backslash backslash ? backslash) off a canonical
+/// path, so stored paths read normally.
+fn plain(path: PathBuf) -> PathBuf {
+    match path.to_str().and_then(|p| p.strip_prefix("\\\\?\\")) {
+        Some(rest) => PathBuf::from(rest),
+        None => path,
+    }
+}

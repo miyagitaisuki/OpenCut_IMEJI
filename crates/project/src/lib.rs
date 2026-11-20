@@ -8,6 +8,7 @@
 //! It is deliberately plain JSON, so QBank, textts and scripts can write
 //! one without OpenCut, and `opencut render` turns it into a video.
 
+mod mascot;
 pub mod ruby;
 mod subtitles;
 mod textts;
@@ -16,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+pub use mascot::{Corner, Mascot, MascotPose, assign_poses, pick_pose};
 pub use subtitles::{parse_srt, write_srt, write_vtt};
 pub use textts::{TexttsImport, import_textts};
 
@@ -57,6 +59,9 @@ pub struct Project {
     pub subtitles: Vec<Cue>,
     #[serde(default)]
     pub markers: Vec<Marker>,
+    /// A chibi in a corner who changes pose with each sentence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mascot: Option<Mascot>,
     /// Integrated loudness the mix is brought to, in LUFS (EBU R128).
     /// -16 by default, what lessons and podcasts use; `null` leaves the
     /// mix as it is.
@@ -188,6 +193,7 @@ impl Default for Project {
             audio: Vec::new(),
             subtitles: Vec::new(),
             markers: Vec::new(),
+            mascot: None,
             loudness_lufs: default_loudness(),
         }
     }
@@ -238,6 +244,11 @@ impl Project {
         }
         for m in &mut self.markers {
             m.time += seconds;
+        }
+        if let Some(mascot) = &mut self.mascot {
+            for p in &mut mascot.timeline {
+                p.time += seconds;
+            }
         }
     }
 
@@ -347,6 +358,29 @@ impl Project {
         for (i, cue) in self.subtitles.iter().enumerate() {
             if !(cue.start >= 0.0 && cue.end > cue.start) {
                 problems.push(format!("subtitles[{i}]: needs 0 <= start < end"));
+            }
+        }
+        if let Some(mascot) = &self.mascot {
+            if !(mascot.height > 0.0 && mascot.height <= 1.0) {
+                problems.push("mascot: height is a fraction of the canvas, above 0 up to 1".into());
+            }
+            match mascot.poses(base) {
+                Err(error) => problems.push(format!("mascot: {error}")),
+                Ok(poses) => {
+                    for pose in &mascot.timeline {
+                        if !poses.contains_key(&pose.pose) {
+                            problems.push(format!("mascot: no pose named {:?}", pose.pose));
+                        }
+                    }
+                    for (name, path) in &poses {
+                        if !path.is_file() {
+                            problems.push(format!(
+                                "mascot: pose {name}: no file at {}",
+                                path.display()
+                            ));
+                        }
+                    }
+                }
             }
         }
         if self

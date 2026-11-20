@@ -48,6 +48,12 @@ export type AvatarManifest = {
     /** The cardigan's shoulder caps, drawn over the arms to hide the seam. */
     shoulders?: string;
   };
+  /**
+   * A pose sheet (chibi): every pose a whole picture, face and hands together,
+   * all on the same canvas (`size`). `scene.gestures` then names poses; the
+   * first is the default. No lip-sync: she changes pose per sentence.
+   */
+  poses?: Record<string, string>;
   /** Sticker effects by name, e.g. lightbulb, sweat, sparkle, exclamation. */
   fx?: Record<string, string>;
   /** A 3D VRM model instead of the layered pictures (`layers` and `rig` are then unused). */

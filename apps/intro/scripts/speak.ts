@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import type { AvatarManifest, IntroProps, Scene } from "../src/types";
+import { autoGestures } from "../src/poses";
 import { type AudioQuery, lacksTiming, queryDuration, retime, visemes } from "../src/visemes";
 
 const root = resolve(import.meta.dir, "..");
@@ -44,6 +45,12 @@ export async function speak(scenePath: string, engine: string): Promise<{ props:
   // and spread the moras over that stretch.
   const span = lacksTiming(query) ? speechSpan(new Uint8Array(wav)) : undefined;
   const timing = span ? retime(query, span.start, span.end - span.start) : query;
+
+  // A pose sheet with no hand-written gestures: pick a pose per sentence.
+  if (avatar.poses && !scene.gestures?.length) {
+    const end = span ? span.end : (wavSeconds(new Uint8Array(wav)) ?? queryDuration(query));
+    scene.gestures = autoGestures(scene.text, Object.keys(avatar.poses), span ? span.start : 0, end);
+  }
 
   const props: IntroProps = {
     scene,
