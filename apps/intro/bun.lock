@@ -9,6 +9,7 @@
         "@react-three/fiber": "^9",
         "@remotion/bundler": "4.0.540",
         "@remotion/cli": "4.0.540",
+        "@remotion/install-whisper-cpp": "4.0.540",
         "@remotion/renderer": "4.0.540",
         "@remotion/three": "4.0.540",
         "@remotion/transitions": "4.0.540",
@@ -273,6 +274,8 @@
     "@remotion/compositor-win32-x64-msvc": ["@remotion/compositor-win32-x64-msvc@4.0.540", "", { "os": "win32", "cpu": "x64" }, "sha512-cU698PDKh7n/o6OXVOUf5WpviP1S2cR7G0vU/lkcUcNAMnT84AmLMejVC2Em1qHCnYcvulYxyLbhx61OWiAg8Q=="],
 
     "@remotion/elevenlabs": ["@remotion/elevenlabs@4.0.540", "", { "dependencies": { "@remotion/captions": "4.0.540", "zod": "4.6.7" } }, "sha512-iU8X5xGwt0ZRZUAp1R9IsXN3Fd2QFaKGbCSKYqGYGSI+Vwi7FC8L0oStKLkONX5HUAJdy9svgmunM1lwvm0Ztw=="],
+
+    "@remotion/install-whisper-cpp": ["@remotion/install-whisper-cpp@4.0.540", "", { "dependencies": { "@remotion/captions": "4.0.540" } }, "sha512-yDyuypgUSUua9ATxpZ16SrcZ8iti0xjZBTg0HQ2zgMznKUXGfWZNTr8rw6zHHwLp8I4DpTVf2zLAUSfZwsJ3mQ=="],
 
     "@remotion/licensing": ["@remotion/licensing@4.0.540", "", {}, "sha512-hnEf8Fb3Fnf8lMNIcMqC46GXrrXggd1p3jx5CCVHpscbaW+e6tocO7Cf5RAD5rLYzWQSj9ZshDb9VCilWOVzFA=="],
 

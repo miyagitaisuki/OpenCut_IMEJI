@@ -4,6 +4,7 @@ import { slide } from "@remotion/transitions/slide";
 import { wipe } from "@remotion/transitions/wipe";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
+import { Captions } from "./Captions";
 import { SceneView } from "./scenes";
 import { Backdrop } from "./theme";
 import type { LessonProps } from "./types";
@@ -29,7 +30,7 @@ const PRESENTATIONS: (() => TransitionPresentation<Record<string, unknown>>)[] =
  * is held `TRANSITION` seconds past its end; the overlap eats that time back, so
  * scene n+1 begins exactly at `segments[n+1].start`.
  */
-export const Lesson: React.FC<LessonProps> = ({ segments }) => {
+export const Lesson: React.FC<LessonProps> = ({ segments, captions }) => {
   const { fps } = useVideoConfig();
   const T = Math.round(TRANSITION * fps);
   // Frames per scene, from the cue times rather than from rounded lengths, so errors do not add up.
@@ -63,6 +64,7 @@ export const Lesson: React.FC<LessonProps> = ({ segments }) => {
           return items;
         })}
       </TransitionSeries>
+      {captions?.length ? <Captions cues={captions} /> : null}
     </AbsoluteFill>
   );
 };

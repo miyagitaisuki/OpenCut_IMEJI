@@ -90,6 +90,20 @@ furigana: `食{た}べる`. Items inside a scene pop in one after another.
 Content stays inside the left/top area (`SAFE` in `src/lesson/theme.tsx`), clear of the chibi in the
 right corner and the burned-in subtitles at the bottom.
 
+### Scene changes and word-by-word subtitles
+
+Scenes change with a 0.5 s slide, fade or wipe (cycled). Each scene is held past its end by that time, so the next one still appears on its cue.
+
+Subtitles can be drawn here, lit word by word (karaoke), instead of by the Rust renderer:
+
+```powershell
+bun run lesson whisper-setup                      # once: whisper.cpp + base model (~150 MB) into .cache/whisper (not in git)
+bun run lesson words  x.project.json              # when each token of the voice is said -> x.words.json
+bun run lesson build  x.visuals.json x.project.json --captions
+```
+
+Without `x.words.json`, `--captions` spreads each cue's time over its text (kana by mora, kanji by reading, pauses at 、。). With it, Whisper's tokens give the real pace; only how far through the sentence it was counts, so Whisper mishearing the words does no harm. With `opencut_ptc.py lesson --visuals ... --karaoke` this is automatic and `--burn-subtitles` is skipped (the intro/outro lines are then not burned in). Set `WHISPER_DIR` to keep Whisper elsewhere.
+
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one
