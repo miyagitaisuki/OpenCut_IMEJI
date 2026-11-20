@@ -29,16 +29,20 @@
     "repository": "https://github.com/cisco/openh264.git",
     "binaries": {
       "linux-x86_64": {
-        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux64.8.so.bz2"
+        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux64.8.so.bz2",
+        "sha256": "27ab53323c110b76214c1c72222f459d17febbcd1e252136cadc292b0308d75b"
       },
       "linux-aarch64": {
-        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux-arm64.8.so.bz2"
+        "url": "http://ciscobinary.openh264.org/libopenh264-2.6.0-linux-arm64.8.so.bz2",
+        "sha256": "a78aea7970150f46bcd3bb7994c9e6dd90bd7a9ea785920f5a73f6964e3fcda7"
       },
       "windows-x86_64": {
-        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win64.dll.bz2"
+        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win64.dll.bz2",
+        "sha256": "dab5f2a872777f9a58b69bfa9fbcf20d9f82f2d6ec91383fd70bff49bd34ac9f"
       },
       "windows-aarch64": {
-        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win-arm64.dll.bz2"
+        "url": "http://ciscobinary.openh264.org/openh264-2.6.0-win-arm64.dll.bz2",
+        "sha256": "6b57d3ecd06bd80b5f3ee1abbb31d48798ca6d89ef1bc98cf2e6d1ebddf5cf45"
       }
     }
   }
