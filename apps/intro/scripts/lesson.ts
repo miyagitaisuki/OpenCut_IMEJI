@@ -292,7 +292,8 @@ async function preview(visualsPath: string, projectPath: string): Promise<string
   let n = 0;
   for (const s of props.segments) {
     // Late enough for everything to have popped in; before the fade-out.
-    const seconds = Math.min(s.start + Math.max(0.5, (s.end - s.start) * 0.8), s.end - 0.4);
+    const at = option("--at"); // e.g. 0.1: shortly after each scene starts, as the video first shows it
+    const seconds = at !== undefined ? s.start + (s.end - s.start) * Number(at) : Math.min(s.start + Math.max(0.5, (s.end - s.start) * 0.8), s.end - 0.4);
     const frame = Math.max(0, Math.min(composition.durationInFrames - 1, Math.round(seconds * FPS)));
     const file = join(dir, `${String(n + 1).padStart(2, "0")}-${s.scene.template}-cue${s.cues[0]}.png`);
     await renderStill({ composition, serveUrl, output: file, frame, inputProps: props, browserExecutable, chromiumOptions, timeoutInMilliseconds });

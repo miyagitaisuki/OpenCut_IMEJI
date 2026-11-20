@@ -81,7 +81,10 @@ def pron(project_path: Path, words_path: Path | None, fix: bool) -> int:
         added = []
         for _, _, text, _ in suspects:
             for kanji, kana in RUBY.findall(text):
-                added.append((kanji, kana))
+                # A single kanji with okurigana (行{い}きます) is a stem, not a word: a dictionary entry for it
+                # would be applied inside other words. Only whole words of two or more kanji are added.
+                if len(kanji) >= 2:
+                    added.append((kanji, kana))
         done = []
         for kanji, kana in dict.fromkeys(added):
             try:

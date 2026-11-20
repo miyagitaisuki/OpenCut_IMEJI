@@ -425,7 +425,7 @@ export const Examples: React.FC<P<ExamplesScene> & { beats?: number[] }> = ({ sc
   const current = times.reduce((cur, t, i) => (sec >= t ? i : cur), -1);
   const n = scene.items.length;
   const w = n >= 4 ? 380 : n === 3 ? 500 : 600;
-  const pic = Math.round(w * 0.6);
+  const pic = Math.round(w * 0.42);
   return (
     <SceneFrame duration={duration} title={scene.title}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
