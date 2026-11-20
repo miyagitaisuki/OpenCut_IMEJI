@@ -1,6 +1,6 @@
 //! `opencut`: OpenCut without a window.
 //!
-//! The same decoding the desktop app uses, for scripts and batch jobs
+//! Decoding and rendering for scripts and batch jobs
 //! (`probe`, `frame`, `thumbnails`) and for AI agents (`mcp`, a Model
 //! Context Protocol server on stdio).
 
@@ -139,7 +139,7 @@ enum Command {
     },
     /// Show the FFmpeg binaries and tools the pipeline uses, and what is missing (exit 1 on issues).
     Env,
-    /// Serve the editor's tools to AI agents over MCP (stdio).
+    /// Serve the pipeline's tools to AI agents over MCP (stdio).
     Mcp,
 }
 
