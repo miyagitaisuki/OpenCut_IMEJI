@@ -2,7 +2,8 @@ import { Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "r
 
 import { Accent } from "./Accent";
 import { C, FIRST, FONT, Jp, Pop, SAFE, SHADOW, STAGGER, SceneFrame, TONES, useReveal } from "./theme";
-import type { ChartScene, CompareScene, DialogueScene, GrammarScene, ImageScene, KeywordScene, LessonScene, TitleScene } from "./types";
+import { practiceTiming } from "./practice";
+import type { ExamplesScene, PracticeScene, ChartScene, CompareScene, DialogueScene, GrammarScene, ImageScene, KeywordScene, LessonScene, TitleScene } from "./types";
 
 type P<T> = { scene: T; duration: number };
 
@@ -355,7 +356,7 @@ export const Dialogue: React.FC<P<DialogueScene>> = ({ scene, duration }) => {
                       boxShadow: SHADOW,
                     }}
                   >
-                    {l.who}
+                    <Jp text={l.who} />
                   </div>
                 ) : null}
                 <div
@@ -406,7 +407,134 @@ export const Keyword: React.FC<P<KeywordScene>> = ({ scene, duration }) => (
   </SceneFrame>
 );
 
-const Body: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, duration }) => {
+/** When card i shows, in seconds from the scene start: when its sentence is read. */
+export function exampleTimes(scene: ExamplesScene, beats: number[] | undefined): number[] {
+  return scene.items.map((it, i) => {
+    const k = (it.cue ?? scene.cue + i) - scene.cue;
+    const b = beats?.length ? beats[Math.min(Math.max(0, k), beats.length - 1)] : undefined;
+    return Math.max(FIRST, b ?? at(i));
+  });
+}
+
+/** Example sentences as picture cards, each popping in when it is read. */
+export const Examples: React.FC<P<ExamplesScene> & { beats?: number[] }> = ({ scene, duration, beats }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const sec = frame / fps;
+  const times = exampleTimes(scene, beats);
+  const current = times.reduce((cur, t, i) => (sec >= t ? i : cur), -1);
+  const n = scene.items.length;
+  const w = n >= 4 ? 380 : n === 3 ? 500 : 600;
+  const pic = Math.round(w * 0.42);
+  return (
+    <SceneFrame duration={duration} title={scene.title}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
+        <div style={{ display: "flex", gap: 28, alignItems: "stretch" }}>
+          {scene.items.map((it, i) => (
+            <div key={i} style={{ visibility: sec >= times[i] - 0.05 ? "visible" : "hidden" }}>
+              <Pop at={times[i]} from="up" style={{ height: "100%" }}>
+                <div
+                  style={{
+                    width: w,
+                    height: "100%",
+                    background: "#fff",
+                    borderRadius: 30,
+                    border: `4px solid ${i === current ? C.rose : C.pink}`,
+                    boxShadow: SHADOW,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    transform: `scale(${i === current ? 1.03 : 1})`,
+                  }}
+                >
+                  {it.picture ? (
+                    <div style={{ width: "100%", height: pic, background: C.pinkSoft, overflow: "hidden" }}>
+                      <Img src={it.picture.startsWith("http") ? it.picture : staticFile(it.picture)} style={{ height: "100%", width: "100%", objectFit: "cover" }} />
+                    </div>
+                  ) : null}
+                  <div style={{ padding: "14px 22px 18px", textAlign: "center", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <Jp
+                      text={it.text}
+                      style={{ fontSize: Math.min(42, Math.floor((w - 50) / Math.max(1, [...it.text.replace(/\{[^}]*\}/g, "")].length))), fontWeight: 800, color: C.navy, lineHeight: 1.6, whiteSpace: "nowrap" }}
+                    />
+                    {it.translation ? <span style={{ fontFamily: FONT, fontSize: 28, fontWeight: 500, color: C.muted }}>{it.translation}</span> : null}
+                  </div>
+                </div>
+              </Pop>
+            </div>
+          ))}
+        </div>
+        {scene.note ? <Jp text={scene.note} style={{ fontSize: 32, fontWeight: 600, color: C.navySoft }} /> : null}
+      </div>
+    </SceneFrame>
+  );
+};
+
+const LETTERS = ["A", "B", "C", "D"];
+
+/** Question and choices, a ring counting down, then the right choice lights up. */
+export const Practice: React.FC<P<PracticeScene>> = ({ scene, duration }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const sec = frame / fps;
+  const { countFrom, reveal } = practiceTiming(duration, scene.think ?? 5, scene.options.length);
+  const shown = useReveal(reveal);
+  const left = Math.max(0, Math.ceil(reveal - sec));
+  const ring = interpolate(sec, [countFrom, reveal], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const R = 46;
+  const L = 2 * Math.PI * R;
+  return (
+    <SceneFrame duration={duration} title={scene.title}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 26, alignItems: "center", width: "100%" }}>
+        <Pop at={FIRST} from="up">
+          <Jp text={scene.question} style={{ fontSize: 60, fontWeight: 800, color: C.navy }} />
+        </Pop>
+        <div style={{ display: "flex", gap: 30, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+          {scene.options.map((o, i) => {
+            const right = i === scene.answer;
+            const dim = shown > 0.5 && !right;
+            return (
+              <Pop key={i} at={at(i + 1)} from="scale">
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 18,
+                    background: right && shown > 0.5 ? C.mint : "#fff",
+                    border: `4px solid ${right && shown > 0.5 ? "#6fcaa5" : C.pink}`,
+                    borderRadius: 30,
+                    padding: "18px 36px",
+                    boxShadow: SHADOW,
+                    opacity: dim ? 0.45 : 1,
+                    transform: `scale(${right ? 1 + 0.08 * shown : 1})`,
+                  }}
+                >
+                  <span style={{ fontSize: 44, fontWeight: 800, color: C.rose }}>{LETTERS[i]}</span>
+                  <Jp text={o} style={{ fontSize: 52, fontWeight: 700, color: C.ink }} />
+                </div>
+              </Pop>
+            );
+          })}
+          {sec >= countFrom && sec < reveal ? (
+            <svg width={112} height={112} viewBox="0 0 112 112">
+              <circle cx={56} cy={56} r={R} fill="#fff" stroke={C.pinkSoft} strokeWidth={10} />
+              <circle cx={56} cy={56} r={R} fill="none" stroke={C.rose} strokeWidth={10} strokeLinecap="round" strokeDasharray={L} strokeDashoffset={L * (1 - ring)} transform="rotate(-90 56 56)" />
+              <text x={56} y={72} textAnchor="middle" fontSize={46} fontWeight={800} fill={C.navy} fontFamily={FONT}>{left}</text>
+            </svg>
+          ) : null}
+        </div>
+        {scene.explain && shown > 0.01 ? (
+          <div style={{ opacity: shown }}>
+            <Jp text={scene.explain} style={{ fontSize: 38, color: C.navySoft, fontWeight: 500 }} />
+          </div>
+        ) : null}
+      </div>
+    </SceneFrame>
+  );
+};
+
+const Body: React.FC<{ scene: LessonScene; duration: number; beats?: number[] }> = ({ scene, duration, beats }) => {
   switch (scene.template) {
     case "title":
       return <Title scene={scene} duration={duration} />;
@@ -420,15 +548,24 @@ const Body: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, durat
       return <Dialogue scene={scene} duration={duration} />;
     case "image":
       return <Picture scene={scene} duration={duration} />;
+    case "examples":
+      return <Examples scene={scene} duration={duration} beats={beats} />;
+    case "practice":
+      return (
+        <>
+          <Practice scene={scene} duration={duration} />
+          <Accent kind="check" at={practiceTiming(duration, scene.think ?? 5, scene.options.length).reveal} />
+        </>
+      );
     case "keyword":
       return <Keyword scene={scene} duration={duration} />;
   }
 };
 
 /** A scene, with its accent sticker over it when the scene asks for one. */
-export const SceneView: React.FC<{ scene: LessonScene; duration: number }> = ({ scene, duration }) => (
+export const SceneView: React.FC<{ scene: LessonScene; duration: number; beats?: number[] }> = ({ scene, duration, beats }) => (
   <>
-    <Body scene={scene} duration={duration} />
+    <Body scene={scene} duration={duration} beats={beats} />
     {"accent" in scene && scene.accent ? <Accent kind={scene.accent} at={scene.accent_at ?? 0.8} /> : null}
   </>
 );
