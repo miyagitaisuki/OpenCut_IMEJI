@@ -45,7 +45,8 @@ export function pickPose(sentence: string, available: string[], previous?: strin
     const ok = list.filter(has);
     return ok.find((p) => p !== previous) ?? ok[0];
   };
-  if (QUESTION.test(sentence)) {
+  // Surprise ("えっ、本当に？") picks its own pose.
+  if (QUESTION.test(sentence) && !/えっ|びっくり|驚/.test(sentence)) {
     const q = choose(["ask_finger_chin", "think_chin", "hold_mic"]);
     if (q) return q;
   }

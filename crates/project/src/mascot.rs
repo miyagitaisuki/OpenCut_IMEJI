@@ -236,6 +236,13 @@ const NEUTRAL: &[&str] = &[
 ];
 
 fn is_question(sentence: &str) -> bool {
+    // Surprise ("えっ、本当に？") picks its own pose.
+    if ["えっ", "びっくり", "驚"]
+        .iter()
+        .any(|w| sentence.contains(w))
+    {
+        return false;
+    }
     let s = sentence.trim_end_matches(['。', '！', '!', ' ']);
     s.ends_with('？') || s.ends_with('?') || s.ends_with("ですか") || s.ends_with("ますか")
 }
