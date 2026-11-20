@@ -52,6 +52,44 @@ beside her.
 No engine at hand? `bun run scripts/mock-engine.ts` serves a stand-in on
 port 10101 (a tone instead of a voice, rough mora timing) to try the pipeline.
 
+## Lesson visuals (charts, diagrams, effects for the body)
+
+The body of a lesson gets pictures that change with each sentence: a soft pastel
+background and one **scene** per stretch of subtitle cues. Remotion renders them
+as one silent 1920x1080 video; OpenCut lays the voice, subtitles and the chibi on it.
+
+```sh
+# 1. Claude (or you) writes <lesson>.visuals.json from the script, cue by cue.
+# 2. Look at one still per scene, fix the JSON, repeat:
+node scripts/lesson.ts preview scenes/ptc-vi.visuals.json ../../lessons/ptc-vi/ptc-vi.project.json
+# 3. Render the background and make it the project's picture:
+node scripts/lesson.ts build scenes/ptc-vi.visuals.json my.project.json
+opencut mascot my.project.json --avatar apps/intro/public/avatars/chibi
+opencut render my.project.json --burn-subtitles
+```
+
+`bun run lesson ...` is the same as `node scripts/lesson.ts ...` (it runs on **Node 22+**: Remotion's
+headless browser hangs under Bun). `lesson render` writes only the video, `lesson apply <project> <video>` only
+swaps the picture. `opencut_ptc.py lesson ... --visuals x.visuals.json` does it inside the PTC flow.
+
+A scene is tied to a subtitle cue by its 0-based index (`cue`) and lasts until the next scene
+(or `until_cue`). Cues no scene covers get a **keyword** scene (the cue's key word, big, with its
+translation), so the screen is never empty. The first scene also covers the lead-in. Text may carry
+furigana: `食{た}べる`. Items inside a scene pop in one after another.
+
+| `template` | Fields |
+|---|---|
+| `title` | `title`, `subtitle?`, `badge?` |
+| `grammar` | `title?`, `parts: [{text, label?, tone?}]`, `join?: "+"\|"→"`, `result?: {text, label?}`, `note?` |
+| `compare` | `title?`, `left`/`right: {title, items[], tone?}` |
+| `chart` | `title?`, `kind: "bar"\|"donut"`, `items: [{label, value}]`, `unit?`, `highlight?` (index) |
+| `dialogue` | `title?`, `layout?: "bubbles"\|"timeline"`, `lines: [{who?, text, side?}]` |
+
+`tone` is `pink`, `navy`, `mint`, `sun` or `sky`. Examples: `scenes/lesson-sample.visuals.json`
+(every template, with made-up numbers) and `scenes/ptc-vi.visuals.json` (a real listening lesson).
+Content stays inside the left/top area (`SAFE` in `src/lesson/theme.tsx`), clear of the chibi in the
+right corner and the burned-in subtitles at the bottom.
+
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one

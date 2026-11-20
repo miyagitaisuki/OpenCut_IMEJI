@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "title": "lesson-sample",
+  "canvas": { "width": 1920, "height": 1080, "fps": 30, "background": "#ffffff" },
+  "visuals": [],
+  "audio": [{ "path": "sample.mp3", "start": 0, "duration": 36 }],
+  "subtitles": [
+    { "start": 1, "end": 5, "text": "今日{きょう}の文法{ぶんぽう}は「〜てしまう」です。", "translation": "Ngữ pháp hôm nay là 「〜てしまう」." },
+    { "start": 6, "end": 11, "text": "動詞{どうし}のて形{けい}に「しまう」をつけます。", "translation": "Thêm 「しまう」 vào thể て của động từ." },
+    { "start": 12, "end": 17, "text": "「食{た}べてしまう」は「全部{ぜんぶ}食{た}べる」という意味{いみ}です。", "translation": "Nghĩa là ăn hết." },
+    { "start": 18, "end": 23, "text": "「忘{わす}れてしまった」は残念{ざんねん}な気持{きも}ちです。", "translation": "Thể hiện sự tiếc nuối." },
+    { "start": 24, "end": 30, "text": "クラスのアンケートでは、半分{はんぶん}以上{いじょう}が正解{せいかい}しました。", "translation": "Hơn một nửa đã trả lời đúng." },
+    { "start": 31, "end": 35, "text": "では、練習{れんしゅう}しましょう。", "translation": "Nào, cùng luyện tập." }
+  ],
+  "markers": []
+}

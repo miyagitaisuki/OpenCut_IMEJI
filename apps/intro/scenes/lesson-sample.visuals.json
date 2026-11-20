@@ -1,0 +1,24 @@
+{
+  "scenes": [
+    { "cue": 0, "template": "title", "title": "～てしまう", "subtitle": "N4　文法{ぶんぽう}", "badge": "N4" },
+    { "cue": 1, "template": "grammar", "title": "作{つく}り方{かた}", "parts": [
+      { "text": "食{た}べて", "label": "動詞{どうし}のて形{けい}" },
+      { "text": "しまう", "label": "補助動詞{ほじょどうし}" }
+    ], "result": { "text": "食{た}べてしまう", "label": "全部{ぜんぶ}〜する" }, "note": "過去{かこ}は「〜てしまった」" },
+    { "cue": 2, "template": "compare", "title": "二{ふた}つの意味{いみ}", "left": { "title": "完了{かんりょう}", "items": ["全部{ぜんぶ}食{た}べてしまった", "宿題{しゅくだい}を終{お}わらせてしまった"], "tone": "mint" }, "right": { "title": "残念{ざんねん}", "items": ["傘{かさ}を忘{わす}れてしまった", "財布{さいふ}を落{お}としてしまった"], "tone": "pink" } },
+    { "cue": 3, "template": "dialogue", "title": "会話{かいわ}の例{れい}", "lines": [
+      { "who": "A", "text": "どうしたの？" },
+      { "who": "B", "text": "かぎをなくしてしまった。" },
+      { "who": "A", "text": "えっ、大変{たいへん}！" }
+    ] },
+    { "cue": 4, "template": "chart", "kind": "bar", "title": "正答率{せいとうりつ}（サンプル）", "unit": "%", "highlight": 0, "items": [
+      { "label": "〜てしまう", "value": 68 },
+      { "label": "〜ておく", "value": 52 },
+      { "label": "〜てみる", "value": 75 }
+    ] },
+    { "cue": 5, "template": "chart", "kind": "donut", "title": "答{こた}え（サンプル）", "unit": "人", "highlight": 0, "items": [
+      { "label": "正解", "value": 18 },
+      { "label": "不正解", "value": 12 }
+    ] }
+  ]
+}
