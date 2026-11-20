@@ -249,6 +249,12 @@ fn open_video_encoder(
         .into())
 }
 
+/// Whether the pinned FFmpeg build has the hardware H.264 encoder `h264_mf` (Windows MediaFoundation).
+/// When it does not, Auto falls back to OpenH264 or MPEG-4.
+pub fn hardware_h264_available() -> bool {
+    crate::init().is_ok() && encoder::find_by_name("h264_mf").is_some()
+}
+
 /// Encoders to try for `choice`, in order.
 fn find_video_codecs(choice: VideoCodec) -> Result<Vec<ffmpeg_next::Codec>> {
     // Cisco's OpenH264 is the software H.264 encoder: with the user's switch

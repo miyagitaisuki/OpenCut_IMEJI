@@ -16,7 +16,7 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) 
 - **CLI `opencut`** (`apps/cli`): probe, frame, thumbnails, import-textts, mascot, check, render, render-batch, env, h264, mcp (12 tool MCP).
 - **Intro/cảnh** (`apps/intro`, Remotion): avatar sakura và chibi 36 tư thế, lồng tiếng AivisSpeech, cảnh lesson (title, grammar, compare, chart, dialogue, practice), bản Shorts dọc, thumbnail (`Thumbnail.tsx`).
 - **Pipeline Python** (`scripts/`, chỉ dùng standard library): `opencut_ptc.py`, `opencut_scenes.py` (Claude sinh cảnh), `lesson_audio.py`, `lesson_qc.py` (pron, engine, layout, video; circuit breaker, quarantine), `homographs.py` (5 từ tĩnh), `lesson_jobs.py` (hàng đợi HTTP, bộ nhớ/file), `publish_youtube.py` (có publish gate: cần QC PASSED).
-- **Nhánh hiện tại**: `feat/publish-gate-shorts`, còn thay đổi chưa commit (encode, batch CLI, `.claude/`, `.agents/`, `.remotion/`).
+- **Nhánh hiện tại**: `feat/ducking-fugashi-encoder` (PR #32, đã merge). Cây làm việc sạch trước phiên Cổng 1.
 
 ## 3. Quyết định đã chốt
 
@@ -108,4 +108,33 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) 
   - Gộp audio và ducking đã là một đồ thị FFmpeg, video copy.
 - **Bước 9**: xong. MCP `submit_lesson_job`, `get_job_status`, `list_quarantine`; dashboard `/dashboard`; nghe đoạn bị flag và nhập cách đọc cho textts (`pron_review.py`). Cố ý không có tool đăng video.
 
-Còn lại: không có mục bắt buộc. Việc tùy chọn: thêm bộ đo `pron` trên bài thật, và kiểm tra ducking trên bài có nhạc nền thật.
+## 8. Giai đoạn kiểm định: 4 cổng (từ 2026-11-20)
+
+Không mở roadmap tính năng mới. Mỗi giai đoạn chỉ mở khi cổng trước đạt tiêu chí bằng số liệu thật.
+
+### Cổng 1. Đóng băng và khóa an toàn
+- [x] `lesson_jobs.py`: mặc định bind `127.0.0.1`. Bind ra ngoài loopback bắt buộc có `LESSON_JOBS_TOKEN`, nếu không server từ chối khởi động (exit 2). POST (submit, retry, accept, readings, cancel, publish) cần `Authorization: Bearer <token>` khi có token. Dashboard hỏi token một lần, giữ trong `sessionStorage`. Test: `scripts/test_lesson_jobs.py` (22 test).
+- [x] `opencut env`: kiểm tra `fugashi` + từ điển trong `OPENCUT_TAGGER_PYTHON` (hoặc python PATH), `textts` đang nghe ở `TEXTTS_URL`, `h264_mf` có trong FFmpeg đã ghim.
+- [ ] Merge các PR còn lại về `main` và gắn tag `v1.0-rc1`. **Chờ người dùng xác nhận**: quy ước dự án không cho agent tự merge.
+- Ghi chú: GET (log job, danh sách job) vẫn mở khi bind ra ngoài. Nếu cần ẩn, mở rộng token sang GET.
+
+### Cổng 2. Đo trên tập bài chuẩn (5–10 bài, đủ ngữ pháp, so sánh, hội thoại, luyện tập)
+- [ ] Tỷ lệ SceneSpec hợp lệ ngay lần 1; tỷ lệ phải retry; số cảnh lỗi trình bày khi xem bằng mắt (tràn khung, chữ đè mascot, chuyển cảnh nhanh).
+- [ ] Hiệu chuẩn QC so với tai người dạy: tỷ lệ False Positive (pron chặn nhầm) và False Negative (sai kanji bị bỏ lọt). Cần khoảng 30–50 câu có nhãn.
+- [ ] `measure_ducking.py` trên bản mix có nhạc nền thật: giảm nền nằm trong 18–24 dB.
+- [ ] Đọc furigana trên điện thoại (h264_mf); xem Thumbnail ở ~320 px ngang.
+- [ ] Thời gian máy chạy và số phút người can thiệp (pron_review, chỉnh cảnh, duyệt publish) mỗi bài.
+- Cần người dạy nghe và người chạy thật. Agent không tự làm được phần này.
+
+### Cổng 3. Tinh chỉnh theo log Cổng 2 (chỉ sửa điểm nghẽn đã thấy)
+- [ ] Ngân sách ký tự trong `scene_spec.schema.json` (độ dài tiêu đề, số dòng mỗi thẻ) nếu có lỗi tràn chữ.
+- [ ] Nạp mẫu lỗi phát âm thật từ `pron_review.py` vào override, rà soát thủ công trước khi áp dụng để tránh sai lan sang bài khác. Hạ báo động giả QC.
+- [ ] Thumbnail hiển thị cạnh nút Publish trên dashboard, kèm kiểm tra kỹ thuật (độ phân giải, chữ không cắt mép). Không chấm thẩm mỹ bằng AI.
+- [ ] Encoder: chỉ biên dịch libx264 nếu Cổng 2 cho thấy h264_mf làm mờ furigana.
+
+### Cổng 4. Mở rộng sản lượng (sau khi Cổng 3 ổn định)
+- [ ] Cắt Shorts 9:16 tự động từ bài dài, dùng chapters và cảnh ngắn có sẵn (grammar, compare, practice 30–50 giây).
+- [ ] Đóng gói môi trường: tự động hóa `OPENCUT_TAGGER_PYTHON`.
+- [ ] Vòng phản hồi YouTube sau 10–20 video: CTR Thumbnail, tỷ lệ giữ chân 30 giây đầu, điều chỉnh Intro và mẫu Thumbnail.
+
+Việc tùy chọn còn lại từ trước: đo `pron` trên bài thật và kiểm tra ducking trên bài có nhạc nền (đã nằm trong Cổng 2).

@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import hmac
 import json
 import os
 import queue
@@ -703,7 +704,25 @@ def _last_json(text: str) -> dict | None:
     return None
 
 
-def make_handler(store: Store, runner: Runner):
+TOKEN_ENV = "LESSON_JOBS_TOKEN"
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def bind_problem(host: str, token: str | None) -> str | None:
+    """Refuse a non-loopback bind without a token: state-changing endpoints must not be open to the LAN."""
+    if host in LOOPBACK_HOSTS or token:
+        return None
+    return f"--host {host} is not loopback: set {TOKEN_ENV} so that POST requests need a Bearer token"
+
+
+def authorized(header: str | None, token: str | None) -> bool:
+    """With no token configured, POST is open (loopback only). With one, it needs `Authorization: Bearer <token>`."""
+    if not token:
+        return True
+    return header is not None and hmac.compare_digest(header.encode("utf-8"), f"Bearer {token}".encode("utf-8"))
+
+
+def make_handler(store: Store, runner: Runner, token: str | None = None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # quieter than the default
             sys.stderr.write(f"{self.command} {self.path} -> {args[1] if len(args) > 1 else ''}\n")
@@ -763,6 +782,8 @@ def make_handler(store: Store, runner: Runner):
 
         def do_POST(self):
             parts = [p for p in self.path.split("?")[0].split("/") if p]
+            if not authorized(self.headers.get("Authorization"), token):
+                return self._send(401, {"error": f"missing or wrong Bearer token (set {TOKEN_ENV})"})
             try:
                 body = self._body()
                 if parts == ["jobs"]:
@@ -795,9 +816,14 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--open", action="store_true", default=FROZEN,
                        help="Open the dashboard in the browser (default for the exe)")
     args = parser.parse_args(argv if argv is not None else (sys.argv[1:] or ["serve"]))  # no command: serve
+    token = os.environ.get(TOKEN_ENV) or None
+    problem = bind_problem(args.host, token)
+    if problem:
+        print(f"refusing to serve: {problem}", file=sys.stderr)
+        return 2
     store = Store(JOBS_DIR)
     runner = Runner(store)
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(store, runner))
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(store, runner, token))
     url = f"http://{args.host}:{args.port}"
     print(f"lesson jobs on {url} (state in {JOBS_DIR})", file=sys.stderr)
     print(f"dashboard: {url}/dashboard   (Ctrl+C stops the server)", file=sys.stderr)

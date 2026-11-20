@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -250,6 +251,46 @@ class StagedBuild(unittest.TestCase):
         runner.calls.clear()
         self.build(runner, "b1")
         self.assertEqual(runner.calls, ["tts", "scenes", "render", "mix", "qc", "publish"])
+
+
+
+class TokenAndBind(unittest.TestCase):
+    def test_bind_needs_token_off_loopback(self):
+        self.assertIsNone(lesson_jobs.bind_problem("127.0.0.1", None))
+        self.assertIsNone(lesson_jobs.bind_problem("localhost", None))
+        self.assertIsNone(lesson_jobs.bind_problem("0.0.0.0", "secret"))
+        self.assertIsNotNone(lesson_jobs.bind_problem("0.0.0.0", None))
+        self.assertIsNotNone(lesson_jobs.bind_problem("192.168.1.5", None))
+
+    def test_authorized(self):
+        self.assertTrue(lesson_jobs.authorized(None, None))
+        self.assertTrue(lesson_jobs.authorized("anything", None))
+        self.assertFalse(lesson_jobs.authorized(None, "secret"))
+        self.assertFalse(lesson_jobs.authorized("Bearer wrong", "secret"))
+        self.assertFalse(lesson_jobs.authorized("secret", "secret"))
+        self.assertTrue(lesson_jobs.authorized("Bearer secret", "secret"))
+
+    def test_post_rejected_without_token_over_http(self):
+        import http.client
+        from http.server import ThreadingHTTPServer
+
+        handler = lesson_jobs.make_handler(None, None, token="secret")  # 401 is sent before any store/runner use
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            port = server.server_address[1]
+            for header in (None, "Bearer nope"):
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                headers = {"Content-Type": "application/json"}
+                if header:
+                    headers["Authorization"] = header
+                conn.request("POST", "/jobs/x/retry", body=b"{}", headers=headers)
+                self.assertEqual(conn.getresponse().status, 401)
+                conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":
