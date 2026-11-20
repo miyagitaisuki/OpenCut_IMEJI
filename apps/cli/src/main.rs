@@ -4,6 +4,7 @@
 //! (`probe`, `frame`, `thumbnails`) and for AI agents (`mcp`, a Model
 //! Context Protocol server on stdio).
 
+mod batch;
 mod env;
 mod lesson;
 mod mcp;
@@ -131,6 +132,34 @@ enum Command {
         #[arg(long = "font")]
         fonts: Vec<PathBuf>,
     },
+    /// Render many projects in one run and print a JSON report (exit 1 if any failed).
+    RenderBatch {
+        /// A folder (every `*.project.json` in it) or a manifest .json: an array of
+        /// projects, or {"projects": [...]}; an entry is a path or
+        /// {"project", "output"?, "burn_subtitles"?}.
+        source: PathBuf,
+        /// Folder for the videos; defaults to beside each project.
+        #[arg(long, short)]
+        output_dir: Option<PathBuf>,
+        /// Projects rendered at once.
+        #[arg(long, short, default_value_t = 1)]
+        jobs: usize,
+        /// auto (H.264 when available), h264 or mpeg4.
+        #[arg(long, default_value = "auto")]
+        codec: String,
+        /// Draw the subtitles into the picture (see `render`).
+        #[arg(long)]
+        burn_subtitles: bool,
+        /// Font for burned-in subtitles; repeat to add fallbacks.
+        #[arg(long = "font")]
+        fonts: Vec<PathBuf>,
+        /// Skip projects whose video is at least as new as their project.json.
+        #[arg(long)]
+        skip_existing: bool,
+        /// Start no new renders after the first failure.
+        #[arg(long)]
+        fail_fast: bool,
+    },
     /// Turn H.264 encoding (Cisco's OpenH264) on or off, or show the setting.
     /// Off: `render` falls back to MPEG-4 and `--codec h264` is refused.
     H264 {
@@ -248,6 +277,39 @@ fn main() -> Result<()> {
                 eprintln!("warning: {warning}");
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::RenderBatch {
+            source,
+            output_dir,
+            jobs,
+            codec,
+            burn_subtitles,
+            fonts,
+            skip_existing,
+            fail_fast,
+        } => {
+            lesson::parse_codec(Some(&codec))?;
+            let items = batch::collect(&source)?;
+            let report = batch::run(
+                items,
+                &batch::Options {
+                    output_dir,
+                    codec,
+                    burn_subtitles,
+                    fonts,
+                    jobs,
+                    skip_existing,
+                    fail_fast,
+                },
+            );
+            eprintln!(
+                "{} rendered, {} skipped, {} failed, {} not run",
+                report.rendered, report.skipped, report.failed, report.not_run
+            );
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.ok() {
+                std::process::exit(1);
+            }
         }
         Command::H264 { state } => {
             if let Some(state) = state {
