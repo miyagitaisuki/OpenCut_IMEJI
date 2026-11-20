@@ -195,6 +195,18 @@ def run(cmd: list[str]) -> None:
         raise PtcError(f"{' '.join(cmd[:3])} failed:\n{done.stderr.strip() or done.stdout.strip()}")
 
 
+def apply_visuals(project: Path, visuals: str) -> None:
+    """Renders the lesson's scenes (apps/intro `lesson build`) and makes them the project's picture."""
+    node = shutil.which("node")
+    if not node:
+        raise PtcError("--visuals needs Node.js (node 22+ on PATH)")
+    script = REPO / "apps" / "intro" / "scripts" / "lesson.ts"
+    done = subprocess.run([node, str(script), "build", str(Path(visuals).resolve()), str(project.resolve())],
+                          cwd=script.parent.parent, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if done.returncode != 0:
+        raise PtcError("lesson visuals failed:\n" + (done.stderr.strip() or done.stdout.strip()))
+
+
 def add_question_markers(project_path: Path, questions: list[dict], starts: list[int]) -> int:
     """One `question` marker per question, at its first spoken line's cue (intro offset included)."""
     project = json.loads(project_path.read_text(encoding="utf-8"))
@@ -251,6 +263,11 @@ def make_lesson(args: argparse.Namespace) -> dict:
         cmd += ["--slide", slide]
     run(cmd)
 
+    if args.visuals:
+        # The body picture: Remotion scenes timed by the project's cues. Before the mascot,
+        # which is drawn over it.
+        apply_visuals(project, args.visuals)
+
     if args.mascot:
         # After intro/outro, so poses sit on the final timeline: one per sentence.
         run([opencut, "mascot", str(project), "--avatar", args.mascot])
@@ -303,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--slide", action="append")
     lesson.add_argument("--mascot", metavar="AVATAR_DIR",
                         help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/chibi)")
+    lesson.add_argument("--visuals", metavar="VISUALS_JSON",
+                        help="Scenes for the body (charts, diagrams...), timed by cue: apps/intro/scenes/*.visuals.json")
     lesson.add_argument("--render", action="store_true", help="Also render the video")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")
