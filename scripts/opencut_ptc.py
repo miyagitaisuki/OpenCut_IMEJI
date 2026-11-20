@@ -81,9 +81,43 @@ def to_textts_ruby(text: str) -> str:
     return _QBANK_RUBY.sub(lambda m: f"{m.group(1)}{{{m.group(2)}}}", text)
 
 
-def build_script(questions: list[dict]) -> tuple[str, list[int]]:
-    """The textts script, plus the speech-line index where each question starts."""
-    lines: list[str] = []
+_LEADING_ROLE = re.compile(r"^\s*\[?\d+\]?[\s　:：]*")
+
+
+# QBank's Vietnamese often labels speakers ("Nam:", "Nữ:"); the subtitle needs only the words.
+_SPEAKER_LABEL = re.compile(
+    r"^\s*(Nam|Nữ|Người dẫn|Giáo viên|Học sinh|Thầy|Cô|Bố|Mẹ|Con|Anh|Chị)\s*\d*\s*[:：]\s*"
+)
+
+
+def _is_speech(line: str) -> bool:
+    return bool(_SPEECH.match(line)) and not line.lstrip().startswith("[pause")
+
+
+def _translations(question: dict, speech_lines: list[str]) -> list[str] | None:
+    """One Vietnamese line per spoken line, or None when QBank's translation does not line up."""
+    raw = [
+        _SPEAKER_LABEL.sub("", _LEADING_ROLE.sub("", l)).strip()
+        for l in (question.get("translation") or "").splitlines()
+        if l.strip() and not l.lstrip().startswith("[pause")
+    ]
+    if not raw:
+        return None
+    if len(raw) != len(speech_lines):
+        print(
+            f"warning: question {question['id']}: {len(raw)} translation lines for "
+            f"{len(speech_lines)} spoken lines; translation skipped",
+            file=sys.stderr,
+        )
+        return None
+    return raw
+
+
+def build_script(questions: list[dict]) -> tuple[str, str, list[int]]:
+    """The textts script, the same script with ` // translation` for OpenCut,
+    and the speech-line index where each question starts."""
+    plain: list[str] = []
+    translated: list[str] = []
     starts: list[int] = []
     speech = 0
     for position, question in enumerate(questions):
@@ -91,15 +125,22 @@ def build_script(questions: list[dict]) -> tuple[str, list[int]]:
         if not transcript:
             raise PtcError(f"question {question['id']} has no transcript (not a listening question?)")
         if position:
-            lines.append(f"[pause={PAUSE_BETWEEN_QUESTIONS_MS}]")
+            plain.append(f"[pause={PAUSE_BETWEEN_QUESTIONS_MS}]")
+            translated.append(f"[pause={PAUSE_BETWEEN_QUESTIONS_MS}]")
         starts.append(speech)
-        for raw in to_textts_ruby(transcript).splitlines():
-            if not raw.strip():
-                continue
-            lines.append(raw.rstrip())
-            if _SPEECH.match(raw) and not raw.lstrip().startswith("[pause"):
+        lines = [l.rstrip() for l in to_textts_ruby(transcript).splitlines() if l.strip()]
+        spoken = [l for l in lines if _is_speech(l)]
+        tr = _translations(question, spoken)
+        index = 0
+        for line in lines:
+            plain.append(line)
+            if _is_speech(line):
+                translated.append(f"{line} // {tr[index]}" if tr else line)
+                index += 1
                 speech += 1
-    return "\n".join(lines) + "\n", starts
+            else:
+                translated.append(line)
+    return "\n".join(plain) + "\n", "\n".join(translated) + "\n", starts
 
 
 # ---- textts --------------------------------------------------------------
@@ -154,32 +195,27 @@ def run(cmd: list[str]) -> None:
         raise PtcError(f"{' '.join(cmd[:3])} failed:\n{done.stderr.strip() or done.stdout.strip()}")
 
 
-def line_start_seconds(timeline_result: dict) -> list[float]:
-    """Start time of every spoken line, in order (from the textts result)."""
-    return [item["start_ms"] / 1000.0 for item in timeline_result["timeline"]]
-
-
-def add_question_markers(project_path: Path, questions: list[dict], starts: list[int], times: list[float]) -> int:
+def add_question_markers(project_path: Path, questions: list[dict], starts: list[int]) -> int:
+    """One `question` marker per question, at its first spoken line's cue (intro offset included)."""
     project = json.loads(project_path.read_text(encoding="utf-8"))
+    cues = project.get("subtitles", [])
     markers = project.setdefault("markers", [])
-    added = 0
     for question, first_line in zip(questions, starts):
-        if first_line >= len(times):
+        if first_line >= len(cues):
             raise PtcError(
-                f"question {question['id']} starts at line {first_line}, but textts timed only {len(times)} lines"
+                f"question {question['id']} starts at line {first_line}, but the project has {len(cues)} subtitles"
             )
         markers.append(
             {
-                "time": round(times[first_line], 3),
+                "time": round(cues[first_line]["start"], 3),
                 "kind": "question",
                 "label": question.get("code") or f"Q{question['id']}",
                 "ref": f"qbank:{question['id']}",
             }
         )
-        added += 1
     markers.sort(key=lambda m: m["time"])
     project_path.write_text(json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return added
+    return len(questions)
 
 
 def make_lesson(args: argparse.Namespace) -> dict:
@@ -192,11 +228,13 @@ def make_lesson(args: argparse.Namespace) -> dict:
     if not questions:
         raise PtcError("no listening questions found")
 
-    script, starts = build_script(questions)
+    script, script_tr, starts = build_script(questions)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     name = args.name or out.name
     (out / f"{name}.script.txt").write_text(script, encoding="utf-8")
+    translated_path = out / f"{name}.script.vi.txt"
+    translated_path.write_text(script_tr, encoding="utf-8")
     if args.dry_run:
         return {"dry_run": True, "questions": [q["id"] for q in questions], "script": str(out / f"{name}.script.txt")}
 
@@ -205,7 +243,7 @@ def make_lesson(args: argparse.Namespace) -> dict:
     opencut = find_opencut()
     project = out / f"{name}.project.json"
     cmd = [opencut, "import-textts", str(audio), "--srt", str(srt), "--timeline", str(timeline),
-           "--script", str(out / f"{name}.script.txt"), "--title", args.title or name, "-o", str(project)]
+           "--script", str(translated_path), "--title", args.title or name, "-o", str(project)]
     for flag, value in (("--intro", args.intro), ("--outro", args.outro)):
         if value:
             cmd += [flag, value]
@@ -217,13 +255,8 @@ def make_lesson(args: argparse.Namespace) -> dict:
         # After intro/outro, so poses sit on the final timeline: one per sentence.
         run([opencut, "mascot", str(project), "--avatar", args.mascot])
 
-    # Intro/outro shift the timeline: only add markers when the audio is untouched.
-    shifted = bool(args.intro)
-    if shifted:
-        print("note: --intro shifts the timeline; question markers were not added", file=sys.stderr)
-        markers = 0
-    else:
-        markers = add_question_markers(project, questions, starts, line_start_seconds(result))
+    # Cue times already include any intro, so markers follow the project.
+    markers = add_question_markers(project, questions, starts)
 
     video = None
     if args.render:
