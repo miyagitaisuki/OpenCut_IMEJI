@@ -10,9 +10,11 @@
         "@remotion/bundler": "4.0.540",
         "@remotion/cli": "4.0.540",
         "@remotion/install-whisper-cpp": "4.0.540",
+        "@remotion/lottie": "4.0.540",
         "@remotion/renderer": "4.0.540",
         "@remotion/three": "4.0.540",
         "@remotion/transitions": "4.0.540",
+        "lottie-web": "^5.13.0",
         "pixi-live2d-display-advanced": "^1.1.0",
         "pixi.js": "7.4.2",
         "react": "19.2.0",
@@ -278,6 +280,8 @@
     "@remotion/install-whisper-cpp": ["@remotion/install-whisper-cpp@4.0.540", "", { "dependencies": { "@remotion/captions": "4.0.540" } }, "sha512-yDyuypgUSUua9ATxpZ16SrcZ8iti0xjZBTg0HQ2zgMznKUXGfWZNTr8rw6zHHwLp8I4DpTVf2zLAUSfZwsJ3mQ=="],
 
     "@remotion/licensing": ["@remotion/licensing@4.0.540", "", {}, "sha512-hnEf8Fb3Fnf8lMNIcMqC46GXrrXggd1p3jx5CCVHpscbaW+e6tocO7Cf5RAD5rLYzWQSj9ZshDb9VCilWOVzFA=="],
+
+    "@remotion/lottie": ["@remotion/lottie@4.0.540", "", { "dependencies": { "remotion": "4.0.540" }, "peerDependencies": { "lottie-web": "^5", "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-Lf7gb/B5rI00oTHYzzGd/8W75h458ymMRCbS1rNdq8ewHAug45GhqNxXrk40RzdlkH0pZM9aRRUxHPutjSSSWA=="],
 
     "@remotion/media": ["@remotion/media@4.0.540", "", { "dependencies": { "mediabunny": "1.64.0", "remotion": "4.0.540", "zod": "4.6.7" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-3oZsbUv+TKNhL7Iam7TLas6do8mwN0z40SrJ7P9Aa5lO11Kw6rcRQKlQVWhEP8+8p5EsX9sRbKfCSBBWsvx0Hg=="],
 
@@ -616,6 +620,8 @@
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
 
     "loader-runner": ["loader-runner@4.3.2", "", {}, "sha512-DFEqQ3ihfS9blba08cLfYf1NRAIEm+dDjic073DRDc3/JspI/8wYmtDsHwd3+4hwvdxSK7PGaElfTmm0awWJ4w=="],
+
+    "lottie-web": ["lottie-web@5.13.0", "", {}, "sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ=="],
 
     "lower-case": ["lower-case@2.0.2", "", { "dependencies": { "tslib": "^2.0.3" } }, "sha512-7fm3l3NAF9WfN6W3JOmf5drwpVqX78JtoGJ3A6W0a6ZnldM41w2fV5D490psKFTpMds8TJse/eHLFFsNHHjHgg=="],
 

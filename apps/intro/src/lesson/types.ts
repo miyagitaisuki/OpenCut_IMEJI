@@ -13,6 +13,10 @@ type Timing = {
   cue: number;
   /** Last cue (inclusive). Default: until the next scene's cue. */
   until_cue?: number;
+  /** A small animated sticker in the corner: `check` (right), `cross` (wrong), `star` (well done). */
+  accent?: "check" | "cross" | "star";
+  /** Seconds into the scene when the accent pops. Default 0.8. */
+  accent_at?: number;
 };
 
 export type TitleScene = Timing & {

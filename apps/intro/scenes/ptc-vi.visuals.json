@@ -1,27 +1,151 @@
 {
   "scenes": [
-    { "cue": 0, "template": "title", "title": "聴解{ちょうかい}　問題{もんだい}１", "subtitle": "会社{かいしゃ}で　新商品{しんしょうひん}のアンケート", "badge": "聴解" },
-    { "cue": 1, "until_cue": 1, "template": "dialogue", "title": "会話{かいわ}の場面{ばめん}", "lines": [
-      { "who": "後輩", "text": "アンケート用紙{ようし}の案{あん}ができました。" },
-      { "who": "先輩", "text": "ちょっと見{み}せて。" }
-    ] },
-    { "cue": 2, "until_cue": 2, "template": "grammar", "title": "お願{ねが}いの言{い}い方{かた}", "parts": [
-      { "text": "直{なお}して", "label": "動詞{どうし}のて形{けい}" },
-      { "text": "もらえる？", "label": "もらう（可能形{かのうけい}）" }
-    ], "join": "+", "result": { "text": "直{なお}してもらえる？", "label": "直{なお}してください" }, "note": "「〜てもらえる？」＝ていねいな頼{たの}み方{かた}" },
-    { "cue": 3, "until_cue": 3, "template": "compare", "title": "だれが何{なに}をする？", "left": { "title": "後輩{こうはい}", "items": ["質問{しつもん}を直{なお}す", "営業部{えいぎょうぶ}に協力{きょうりょく}を頼{たの}む？"], "tone": "pink" }, "right": { "title": "先輩{せんぱい}", "items": ["先{さき}に話{はなし}を通{とお}す"], "tone": "sky" } },
-    { "cue": 4, "until_cue": 4, "template": "dialogue", "layout": "timeline", "title": "仕事{しごと}の順番{じゅんばん}", "lines": [
-      { "who": "まず", "text": "質問{しつもん}を直{なお}す" },
-      { "who": "つぎに", "text": "部長{ぶちょう}の確認{かくにん}" },
-      { "who": "それから", "text": "印刷会社{いんさつがいしゃ}へ発注{はっちゅう}" }
-    ] },
-    { "cue": 6, "until_cue": 6, "template": "title", "title": "まず　何{なに}をする？", "subtitle": "答{こた}えは「質問{しつもん}を直{なお}す」", "badge": "答え" },
-    { "cue": 7, "until_cue": 7, "template": "title", "title": "聴解{ちょうかい}　問題{もんだい}２", "subtitle": "オンラインセミナーの準備{じゅんび}", "badge": "聴解" },
-    { "cue": 8, "until_cue": 9, "template": "dialogue", "layout": "timeline", "title": "セミナーの予定{よてい}", "lines": [
-      { "who": "さっき", "text": "資料{しりょう}の修正{しゅうせい}が終{お}わった" },
-      { "who": "二時{にじ}", "text": "音声{おんせい}テスト" },
-      { "who": "？", "text": "URLの案内{あんない}" }
-    ] },
-    { "cue": 10, "until_cue": 11, "template": "compare", "title": "メールの確認{かくにん}", "left": { "title": "しておく", "items": ["URLを再送{さいそう}する"], "tone": "mint" }, "right": { "title": "そのあと", "items": ["音声{おんせい}テストを手伝{てつだ}う"], "tone": "sun" } }
+    {
+      "cue": 0,
+      "template": "title",
+      "title": "聴解{ちょうかい}　問題{もんだい}１",
+      "subtitle": "会社{かいしゃ}で　新商品{しんしょうひん}のアンケート",
+      "badge": "聴解"
+    },
+    {
+      "cue": 1,
+      "until_cue": 1,
+      "template": "dialogue",
+      "title": "会話{かいわ}の場面{ばめん}",
+      "lines": [
+        {
+          "who": "後輩",
+          "text": "アンケート用紙{ようし}の案{あん}ができました。"
+        },
+        {
+          "who": "先輩",
+          "text": "ちょっと見{み}せて。"
+        }
+      ]
+    },
+    {
+      "cue": 2,
+      "until_cue": 2,
+      "template": "grammar",
+      "title": "お願{ねが}いの言{い}い方{かた}",
+      "parts": [
+        {
+          "text": "直{なお}して",
+          "label": "動詞{どうし}のて形{けい}"
+        },
+        {
+          "text": "もらえる？",
+          "label": "もらう（可能形{かのうけい}）"
+        }
+      ],
+      "join": "+",
+      "result": {
+        "text": "直{なお}してもらえる？",
+        "label": "直{なお}してください"
+      },
+      "note": "「〜てもらえる？」＝ていねいな頼{たの}み方{かた}",
+      "accent": "check"
+    },
+    {
+      "cue": 3,
+      "until_cue": 3,
+      "template": "compare",
+      "title": "だれが何{なに}をする？",
+      "left": {
+        "title": "後輩{こうはい}",
+        "items": [
+          "質問{しつもん}を直{なお}す",
+          "営業部{えいぎょうぶ}に協力{きょうりょく}を頼{たの}む？"
+        ],
+        "tone": "pink"
+      },
+      "right": {
+        "title": "先輩{せんぱい}",
+        "items": [
+          "先{さき}に話{はなし}を通{とお}す"
+        ],
+        "tone": "sky"
+      },
+      "accent": "cross"
+    },
+    {
+      "cue": 4,
+      "until_cue": 4,
+      "template": "dialogue",
+      "layout": "timeline",
+      "title": "仕事{しごと}の順番{じゅんばん}",
+      "lines": [
+        {
+          "who": "まず",
+          "text": "質問{しつもん}を直{なお}す"
+        },
+        {
+          "who": "つぎに",
+          "text": "部長{ぶちょう}の確認{かくにん}"
+        },
+        {
+          "who": "それから",
+          "text": "印刷会社{いんさつがいしゃ}へ発注{はっちゅう}"
+        }
+      ]
+    },
+    {
+      "cue": 6,
+      "until_cue": 6,
+      "template": "title",
+      "title": "まず　何{なに}をする？",
+      "subtitle": "答{こた}えは「質問{しつもん}を直{なお}す」",
+      "badge": "答え"
+    },
+    {
+      "cue": 7,
+      "until_cue": 7,
+      "template": "title",
+      "title": "聴解{ちょうかい}　問題{もんだい}２",
+      "subtitle": "オンラインセミナーの準備{じゅんび}",
+      "badge": "聴解"
+    },
+    {
+      "cue": 8,
+      "until_cue": 9,
+      "template": "dialogue",
+      "layout": "timeline",
+      "title": "セミナーの予定{よてい}",
+      "lines": [
+        {
+          "who": "さっき",
+          "text": "資料{しりょう}の修正{しゅうせい}が終{お}わった"
+        },
+        {
+          "who": "二時{にじ}",
+          "text": "音声{おんせい}テスト"
+        },
+        {
+          "who": "？",
+          "text": "URLの案内{あんない}"
+        }
+      ]
+    },
+    {
+      "cue": 10,
+      "until_cue": 11,
+      "template": "compare",
+      "title": "メールの確認{かくにん}",
+      "left": {
+        "title": "しておく",
+        "items": [
+          "URLを再送{さいそう}する"
+        ],
+        "tone": "mint"
+      },
+      "right": {
+        "title": "そのあと",
+        "items": [
+          "音声{おんせい}テストを手伝{てつだ}う"
+        ],
+        "tone": "sun"
+      },
+      "accent": "star"
+    }
   ]
 }
