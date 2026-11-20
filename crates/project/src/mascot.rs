@@ -126,8 +126,26 @@ const RULES: &[(&[&str], &[&str])] = &[
         &["wave"],
     ),
     (&["さようなら", "またね", "次回"], &["wave", "hand_chest"]),
-    (&["ありがとう", "ご視聴", "ご清聴"], &["bow_eyes_closed"]),
-    (&["すみません", "ごめん", "申し訳"], &["bow_eyes_closed"]),
+    (
+        &["ありがとう", "ご視聴", "ご清聴"],
+        &["thanks_hands_together", "bow_eyes_closed"],
+    ),
+    (
+        &["すみません", "ごめん", "申し訳"],
+        &["sorry_sweat", "bow_eyes_closed"],
+    ),
+    (
+        &["えっ", "びっくり", "驚", "本当に", "ほんとうに"],
+        &["surprised"],
+    ),
+    (
+        &["なるほど", "わかりました", "分かりました", "そうか"],
+        &["happy_fist_chest", "idea_finger_up"],
+    ),
+    (
+        &["残念", "悲しい", "かなしい", "寂しい", "さびしい", "つらい"],
+        &["sad_rub_eye"],
+    ),
     (
         &[
             "すばらしい",
@@ -138,7 +156,16 @@ const RULES: &[(&[&str], &[&str])] = &[
             "いいですね",
             "おめでとう",
         ],
-        &["cheer_arms_up", "peace_sign"],
+        &["clap_happy", "thumbs_up", "cheer_arms_up", "peace_sign"],
+    ),
+    (
+        &["大丈夫", "だいじょうぶ", "オッケー", "OK"],
+        &["ok_signs", "thumbs_up"],
+    ),
+    (&["頑張", "がんば"], &["cheer_fists", "cheer_arms_up"]),
+    (
+        &["うれしい", "嬉しい", "よかった", "安心"],
+        &["content_hand_chest", "hand_chest"],
     ),
     (
         &[
@@ -150,7 +177,7 @@ const RULES: &[(&[&str], &[&str])] = &[
             "いけません",
             "不正解",
         ],
-        &["scratch_head", "arms_crossed"],
+        &["wrong_cross_arms", "scratch_head", "arms_crossed"],
     ),
     (
         &[
@@ -160,7 +187,7 @@ const RULES: &[(&[&str], &[&str])] = &[
             "分かりません",
             "できません",
         ],
-        &["shrug_open_palms", "scratch_head"],
+        &["worried_hands_up", "shrug_open_palms", "scratch_head"],
     ),
     (
         &["注意", "気をつけ", "気を付け"],
