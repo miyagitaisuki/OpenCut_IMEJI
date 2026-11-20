@@ -251,6 +251,10 @@ def make_lesson(args: argparse.Namespace) -> dict:
         cmd += ["--slide", slide]
     run(cmd)
 
+    if args.mascot:
+        # After intro/outro, so poses sit on the final timeline: one per sentence.
+        run([opencut, "mascot", str(project), "--avatar", args.mascot])
+
     # Cue times already include any intro, so markers follow the project.
     markers = add_question_markers(project, questions, starts)
 
@@ -297,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--intro")
     lesson.add_argument("--outro")
     lesson.add_argument("--slide", action="append")
+    lesson.add_argument("--mascot", metavar="AVATAR_DIR",
+                        help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/chibi)")
     lesson.add_argument("--render", action="store_true", help="Also render the video")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")

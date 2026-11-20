@@ -189,6 +189,27 @@ pub fn render(
     // Each cue is laid out once, the first time it shows.
     let mut captions: HashMap<usize, Option<Frame>> = HashMap::new();
     let bottom_margin = (f64::from(height) * 0.06) as i64;
+    // The mascot shows from the first subtitle to the last, so a lesson's
+    // intro and outro (which have their own avatar) stay clear of her.
+    let mascot = match &project.mascot {
+        Some(m) if !m.timeline.is_empty() => Some(MascotLayer::load(m, base, width, height)?),
+        _ => None,
+    };
+    // Captions keep clear of the mascot: centred in what her corner leaves.
+    let caption_gap = mascot
+        .as_ref()
+        .map_or(0, |m| m.reserved_width() + i64::from(width) / 80);
+    let caption_area = (i64::from(width) - caption_gap).max(i64::from(width) / 2);
+    let caption_left = match project.mascot.as_ref().map(|m| m.corner) {
+        Some(opencut_project::Corner::BottomLeft) => i64::from(width) - caption_area,
+        _ => 0,
+    };
+    let mascot_from = project
+        .subtitles
+        .iter()
+        .map(|c| c.start)
+        .fold(f64::INFINITY, f64::min);
+    let mascot_to = project.subtitles.iter().map(|c| c.end).fold(0.0, f64::max);
 
     for index in 0..frames {
         let time = index as f64 / f64::from(fps);
@@ -200,6 +221,12 @@ pub fn render(
                 layers.release(layer);
             }
         }
+        if let Some(mascot) = &mascot
+            && time >= mascot_from
+            && time < mascot_to
+        {
+            mascot.draw(&mut picture, time);
+        }
         if let Some(fonts) = &fonts
             && let Some(cue_index) = project
                 .subtitles
@@ -207,10 +234,15 @@ pub fn render(
                 .position(|c| time >= c.start && time < c.end)
         {
             let drawn = captions.entry(cue_index).or_insert_with(|| {
-                caption::render_cue(&project.subtitles[cue_index], fonts, width, height)
+                caption::render_cue(
+                    &project.subtitles[cue_index],
+                    fonts,
+                    caption_area as u32,
+                    height,
+                )
             });
             if let Some(drawn) = drawn {
-                let x = (i64::from(width) - i64::from(drawn.width)) / 2;
+                let x = caption_left + (caption_area - i64::from(drawn.width)) / 2;
                 let y = i64::from(height) - i64::from(drawn.height) - bottom_margin;
                 blit(&mut picture, drawn, x, y);
             }
@@ -518,6 +550,11 @@ fn fill(data: &mut [u8], [r, g, b]: [u8; 3]) {
 
 /// Draws `source` onto `target` at (`x`, `y`), alpha-blended, clipped to the target.
 fn blit(target: &mut Frame, source: &Frame, x: i64, y: i64) {
+    blit_with(target, source, x, y, 255);
+}
+
+/// Like `blit`, the picture's own alpha scaled by `opacity` (0 to 255).
+fn blit_with(target: &mut Frame, source: &Frame, x: i64, y: i64, opacity: u32) {
     let (tw, th) = (i64::from(target.width), i64::from(target.height));
     let (sw, sh) = (i64::from(source.width), i64::from(source.height));
     let (x0, y0) = (x.max(0), y.max(0));
@@ -535,7 +572,7 @@ fn blit(target: &mut Frame, source: &Frame, x: i64, y: i64) {
             .chunks_exact_mut(4)
             .zip(source_row.chunks_exact(4))
         {
-            let alpha = u32::from(s[3]);
+            let alpha = (u32::from(s[3]) * opacity + 127) / 255;
             if alpha == 255 {
                 t[..3].copy_from_slice(&s[..3]);
             } else if alpha > 0 {
@@ -545,6 +582,113 @@ fn blit(target: &mut Frame, source: &Frame, x: i64, y: i64) {
                 }
             }
         }
+    }
+}
+
+/// The mascot's poses, decoded once at their size on the canvas.
+struct MascotLayer<'a> {
+    mascot: &'a opencut_project::Mascot,
+    poses: HashMap<String, Frame>,
+    canvas: (u32, u32),
+}
+
+/// How long one pose melts into the next, and the little hop on the change.
+const POSE_FADE: f64 = 0.15;
+const POSE_HOP: f64 = 0.3;
+
+impl<'a> MascotLayer<'a> {
+    fn load(
+        mascot: &'a opencut_project::Mascot,
+        base: &Path,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
+        let files = mascot
+            .poses(base)
+            .map_err(|e| Error::Invalid(vec![format!("mascot: {e}")]))?;
+        let mut poses = HashMap::new();
+        for pose in &mascot.timeline {
+            if poses.contains_key(&pose.pose) {
+                continue;
+            }
+            let Some(path) = files.get(&pose.pose) else {
+                return Err(Error::Invalid(vec![format!(
+                    "mascot: no pose named {:?}",
+                    pose.pose
+                )]));
+            };
+            let decoded = image::open(path)
+                .map_err(|error| Error::Image {
+                    path: path.clone(),
+                    message: error.to_string(),
+                })?
+                .into_rgba8();
+            let target_h = (f64::from(height) * mascot.height).round().max(2.0) as u32;
+            let target_w = ((f64::from(decoded.width()) * f64::from(target_h)
+                / f64::from(decoded.height()))
+            .round() as u32)
+                .max(1);
+            let resized = image::imageops::resize(
+                &decoded,
+                target_w,
+                target_h,
+                image::imageops::FilterType::CatmullRom,
+            );
+            poses.insert(
+                pose.pose.clone(),
+                Frame {
+                    width: target_w,
+                    height: target_h,
+                    format: PixelFormat::Rgba,
+                    seconds: 0.0,
+                    data: resized.into_raw(),
+                },
+            );
+        }
+        Ok(Self {
+            mascot,
+            poses,
+            canvas: (width, height),
+        })
+    }
+
+    /// Width her corner takes, for captions to keep clear of.
+    fn reserved_width(&self) -> i64 {
+        self.poses
+            .values()
+            .map(|f| i64::from(f.width))
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn draw(&self, picture: &mut Frame, time: f64) {
+        let Some((current, previous, began)) = self.mascot.pose_at(time) else {
+            return;
+        };
+        let Some(now) = self.poses.get(current) else {
+            return;
+        };
+        let since = time - began;
+        let (cw, ch) = (i64::from(self.canvas.0), i64::from(self.canvas.1));
+        let hop = if since < POSE_HOP && previous.is_some() {
+            ((since / POSE_HOP * std::f64::consts::PI).sin() * f64::from(now.height) * 0.025) as i64
+        } else {
+            0
+        };
+        let margin = cw / 80;
+        let x = match self.mascot.corner {
+            opencut_project::Corner::BottomRight => cw - i64::from(now.width) - margin,
+            opencut_project::Corner::BottomLeft => margin,
+        };
+        // Feet a little below the edge, so she stands on the frame.
+        let y = ch - i64::from(now.height) + ch / 60 - hop;
+        let fade = (since / POSE_FADE).clamp(0.0, 1.0);
+        if fade < 1.0
+            && let Some(before) = previous.and_then(|p| self.poses.get(p))
+        {
+            blit(picture, before, x, y);
+        }
+        blit_with(picture, now, x, y, (fade * 255.0) as u32);
     }
 }
 

@@ -93,3 +93,65 @@ export function queryDuration(query: AudioQuery): number {
   }
   return total * scale;
 }
+
+/**
+ * The mouth at `seconds` and how open it is (0..1): it eases in over the
+ * first 40 ms of a vowel and out over the last 40 ms, so a 3D mouth does not
+ * snap between shapes. Closed (blend 1) outside any viseme.
+ */
+export function mouthStateAt(list: Viseme[], seconds: number): { mouth: Mouth; blend: number } {
+  const EASE = 0.04;
+  for (const v of list) {
+    if (seconds < v.start) break;
+    if (seconds < v.end) {
+      const ease = Math.min(EASE, (v.end - v.start) / 2);
+      const blend = Math.min(1, (seconds - v.start) / ease, (v.end - seconds) / ease);
+      return { mouth: v.mouth, blend: Math.max(0, blend) };
+    }
+  }
+  return { mouth: "n", blend: 1 };
+}
+
+/** True when the engine reported no mora lengths at all (AivisSpeech does this). */
+export function lacksTiming(query: AudioQuery): boolean {
+  let total = 0;
+  for (const phrase of query.accent_phrases) {
+    for (const m of [...phrase.moras, ...(phrase.pause_mora ? [phrase.pause_mora] : [])]) {
+      total += (m.consonant_length ?? 0) + m.vowel_length;
+    }
+  }
+  return total < 1e-6;
+}
+
+/**
+ * Spreads the moras over `speechSeconds` of real speech (from `onset` seconds
+ * into the audio) when the engine gave no lengths: every mora gets an equal
+ * share (a small stop ッ and a pause a little more or less), a consonant
+ * taking its bit of it. Not as exact as the engine's own timing, but the
+ * mouth then moves with the voice instead of staying shut.
+ */
+export function retime(query: AudioQuery, onset: number, speechSeconds: number): AudioQuery {
+  const weight = (m: Mora, pause: boolean) => (pause ? 1.6 : m.vowel === "cl" ? 0.7 : 1);
+  let sum = 0;
+  for (const phrase of query.accent_phrases) {
+    for (const m of phrase.moras) sum += weight(m, false);
+    if (phrase.pause_mora) sum += weight(phrase.pause_mora, true);
+  }
+  const unit = sum > 0 ? speechSeconds / sum : 0;
+  const timed = (m: Mora, pause: boolean): Mora => {
+    const d = weight(m, pause) * unit;
+    const hasConsonant = !!m.consonant;
+    return { ...m, consonant_length: hasConsonant ? d * 0.3 : m.consonant_length, vowel_length: hasConsonant ? d * 0.7 : d };
+  };
+  return {
+    ...query,
+    speedScale: 1,
+    prePhonemeLength: onset,
+    postPhonemeLength: 0,
+    accent_phrases: query.accent_phrases.map((phrase) => ({
+      ...phrase,
+      moras: phrase.moras.map((m) => timed(m, false)),
+      pause_mora: phrase.pause_mora ? timed(phrase.pause_mora, true) : phrase.pause_mora,
+    })),
+  };
+}

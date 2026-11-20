@@ -1,3 +1,5 @@
+import type { Live2dConfig } from "./Live2dAvatar";
+import type { VrmConfig } from "./VrmAvatar";
 import type { Mouth, Viseme } from "./visemes";
 
 /** What a teacher writes: `scenes/<name>.json`. */
@@ -46,9 +48,19 @@ export type AvatarManifest = {
     /** The cardigan's shoulder caps, drawn over the arms to hide the seam. */
     shoulders?: string;
   };
+  /**
+   * A pose sheet (chibi): every pose a whole picture, face and hands together,
+   * all on the same canvas (`size`). `scene.gestures` then names poses; the
+   * first is the default. No lip-sync: she changes pose per sentence.
+   */
+  poses?: Record<string, string>;
   /** Sticker effects by name, e.g. lightbulb, sweat, sparkle, exclamation. */
   fx?: Record<string, string>;
-  layers: {
+  /** A 3D VRM model instead of the layered pictures (`layers` and `rig` are then unused). */
+  vrm?: VrmConfig;
+  /** A Live2D (Cubism 3/4) model instead (needs public/lib/live2dcubismcore.min.js). */
+  live2d?: Live2dConfig;
+  layers?: {
     body?: string;
     eyes_open: string;
     eyes_closed: string;

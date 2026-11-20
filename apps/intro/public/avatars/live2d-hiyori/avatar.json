@@ -1,0 +1,5 @@
+{
+  "name": "Hiyori (Live2D sample)",
+  "size": [1, 1],
+  "live2d": { "file": "Hiyori.model3.json", "zoom": 1.9, "center": [0.5, 0.84] }
+}

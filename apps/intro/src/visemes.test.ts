@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { type AudioQuery, mouthAt, queryDuration, visemes } from "./visemes";
+import { type AudioQuery, lacksTiming, mouthAt, queryDuration, retime, visemes } from "./visemes";
 
 // 「ようこそ。まあ」 as VOICEVOX describes it (lengths in seconds).
 const query: AudioQuery = {
@@ -57,4 +57,26 @@ test("gestures switch at their times", async () => {
   expect(gestureAt(list, 1)).toBe("explain");
   expect(gestureAt(list, 3)).toBe("point");
   expect(gestureAt(undefined, 3)).toBeUndefined();
+});
+
+test("an engine with all-zero lengths is retimed over the real speech", () => {
+  const flat: AudioQuery = {
+    accent_phrases: [
+      {
+        moras: [
+          { text: "コ", consonant: "k", consonant_length: 0, vowel: "o", vowel_length: 0 },
+          { text: "ン", consonant: null, consonant_length: null, vowel: "N", vowel_length: 0 },
+          { text: "ニ", consonant: "n", consonant_length: 0, vowel: "i", vowel_length: 0 },
+          { text: "チ", consonant: "ch", consonant_length: 0, vowel: "i", vowel_length: 0 },
+          { text: "ワ", consonant: "w", consonant_length: 0, vowel: "a", vowel_length: 0 },
+        ],
+      },
+    ],
+  };
+  expect(lacksTiming(flat)).toBe(true);
+  expect(lacksTiming(query)).toBe(false);
+  const list = visemes(retime(flat, 0.2, 1.0));
+  expect(list[0].start).toBeCloseTo(0.2 + 0.06, 5); // after the first consonant
+  expect(list[list.length - 1].end).toBeCloseTo(1.2, 5); // speech ends where the voice does
+  expect(list.map((v) => v.mouth)).toEqual(["o", "n", "i", "a"]);
 });
