@@ -68,8 +68,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # so `youtube_quota` imports when run from elsewhere
 import youtube_quota  # noqa: E402
+import pron_review  # noqa: E402
 
-REPO = Path(__file__).resolve().parent.parent
+FROZEN = bool(getattr(sys, "frozen", False))  # the one-file exe (PyInstaller)
+# The repo: OPENCUT_REPO, else the folder the exe sits in (the exe is in the repo root or dist/), else the
+# parent of scripts/.
+REPO = Path(os.environ["OPENCUT_REPO"]).resolve() if os.environ.get("OPENCUT_REPO") else (
+    Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent)
 SCRIPTS = REPO / "scripts"
 LESSONS = REPO / "lessons"
 JOBS_DIR = LESSONS / "_jobs"
@@ -278,6 +283,22 @@ class Runner:
         self.queue.put(("publish", job_id))
         return job
 
+    def teach(self, job_id: str, body: dict) -> dict:
+        """Teaches textts one reading (word -> kana) for a reviewed line. The job is not rebuilt here: the reviewer
+        asks for a retry, and the voice stage then runs again (its key includes the taught readings)."""
+        job = self.store.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        try:
+            pron_review.teach(body.get("word", ""), body.get("reading", ""))
+        except pron_review.ReviewError as error:
+            raise JobError(str(error)) from error
+        job["outputs"].setdefault("readings_taught", []).append(
+            {"word": body["word"].strip(), "reading": body["reading"].strip()})
+        job["outputs"]["readings_taught"] = job["outputs"]["readings_taught"][-200:]
+        self.store.save(job)
+        return job
+
     def accept(self, job_id: str) -> dict:
         """A person reviewed a quarantined job and accepts it: mix, QC and the publish dry run follow."""
         job = self.store.get(job_id)
@@ -405,7 +426,9 @@ class Runner:
         return "".join(lines)
 
     def _py(self, script: str, *args: str) -> list[str]:
-        return [sys.executable, str(SCRIPTS / script), *args]
+        # The exe cannot run the scripts itself: they need a Python interpreter (OPENCUT_PYTHON, else `python`).
+        python = os.environ.get("OPENCUT_PYTHON") or ("python" if FROZEN else sys.executable)
+        return [python, str(SCRIPTS / script), *args]
 
     def _lesson_args(self, spec: dict, out: Path) -> tuple[list[str], list[Path] | None]:
         """The options every stage of a job gets (the stage flag is added per call). Returns the command and,
@@ -471,7 +494,8 @@ class Runner:
             self.store.save(job)
             return
 
-        tts_key = _hash_text(name, spec["title"], spec["level"], _hash_files(*inputs, voices)) if inputs else None
+        taught = job["outputs"].get("readings_taught") or []
+        tts_key = _hash_text(name, spec["title"], spec["level"], taught, _hash_files(*inputs, voices)) if inputs else None
         attempts = 2
         ran_tts = False
         engine_ok: bool | None = None
@@ -717,6 +741,21 @@ def make_handler(store: Store, runner: Runner):
                     return self._send(404, {"error": "no such job"})
                 if len(parts) == 2:
                     return self._send(200, job)
+                if parts[2:] == ["review"]:
+                    folder = LESSONS / job["spec"]["name"]
+                    return self._send(200, {"lines": pron_review.flagged(folder, job["spec"]["name"]),
+                                            "taught": job["outputs"].get("readings_taught") or []})
+                if len(parts) == 4 and parts[2] == "clip":
+                    try:
+                        audio = pron_review.clip(LESSONS / job["spec"]["name"], job["spec"]["name"], parts[3])
+                    except pron_review.ReviewError as error:
+                        return self._send(400, {"error": str(error)})
+                    self.send_response(200)
+                    self.send_header("Content-Type", "audio/mpeg")
+                    self.send_header("Content-Length", str(len(audio)))
+                    self.end_headers()
+                    self.wfile.write(audio)
+                    return
                 if parts[2:] == ["log"]:
                     log = store.log_path(parts[1])
                     return self._send(200, log.read_text(encoding="utf-8") if log.exists() else "", "text/plain")
@@ -732,6 +771,8 @@ def make_handler(store: Store, runner: Runner):
                     return self._send(200, runner.cancel(parts[1]))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "retry":
                     return self._send(202, runner.retry(parts[1], force=bool(body.get("force"))))
+                if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "readings":
+                    return self._send(202, runner.teach(parts[1], body))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "accept":
                     return self._send(202, runner.accept(parts[1]))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "publish":
@@ -751,11 +792,18 @@ def main(argv: list[str] | None = None) -> int:
     serve = sub.add_parser("serve", help="Run the job server")
     serve.add_argument("--port", type=int, default=int(os.environ.get("LESSON_JOBS_PORT", "8790")))
     serve.add_argument("--host", default="127.0.0.1")
-    args = parser.parse_args(argv)
+    serve.add_argument("--open", action="store_true", default=FROZEN,
+                       help="Open the dashboard in the browser (default for the exe)")
+    args = parser.parse_args(argv if argv is not None else (sys.argv[1:] or ["serve"]))  # no command: serve
     store = Store(JOBS_DIR)
     runner = Runner(store)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(store, runner))
-    print(f"lesson jobs on http://{args.host}:{args.port} (state in {JOBS_DIR})", file=sys.stderr)
+    url = f"http://{args.host}:{args.port}"
+    print(f"lesson jobs on {url} (state in {JOBS_DIR})", file=sys.stderr)
+    print(f"dashboard: {url}/dashboard   (Ctrl+C stops the server)", file=sys.stderr)
+    if args.open:
+        import webbrowser
+        threading.Timer(1.0, webbrowser.open, args=[f"{url}/dashboard"]).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
