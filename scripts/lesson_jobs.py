@@ -22,6 +22,7 @@ Endpoints (JSON in and out; listens on 127.0.0.1 only):
   POST /jobs/<id>/accept     a quarantined job, reviewed by a person: continue to mix, QC and the publish check
   POST /jobs/<id>/publish    upload to YouTube (job must be `awaiting_approval`)
   GET  /health
+  GET  /dashboard            the queue page (scripts/lesson_dashboard.html)
 
 POST /jobs body, one source:
   {"questions": [7323, 7514]}                       QBank question ids
@@ -704,6 +705,8 @@ def make_handler(store: Store, runner: Runner):
 
         def do_GET(self):
             parts = [p for p in self.path.split("?")[0].split("/") if p]
+            if parts in ([], ["dashboard"]):
+                return self._send(200, (SCRIPTS / "lesson_dashboard.html").read_text(encoding="utf-8"), "text/html")
             if parts == ["health"]:
                 return self._send(200, {"ok": True, "queued": runner.queue.qsize()})
             if parts == ["jobs"]:
