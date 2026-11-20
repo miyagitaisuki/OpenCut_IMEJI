@@ -18,6 +18,9 @@ test("strips furigana and picks a key word", () => {
   expect(keywordOf("アンケートを見てください。")).toBe("アンケート");
   expect(keywordOf("はい。")).toBe("はい");
   expect(keywordOf("わかりました。ではまた。")).toBe("わかりました");
+  // A sentence with no long kanji word is kept whole, not cut at 12 characters.
+  expect(keywordOf("女{おんな}の人{ひと}はこれからまずなにをしますか。")).toBe("女の人はこれからまずなにをしますか");
+  expect(keywordOf("そうですね、それではまたあしたおあいしましょうね、さようなら。")).toBe("そうですね");
 });
 
 test("a scene lasts until the next scene's cue; segments tile the body", () => {

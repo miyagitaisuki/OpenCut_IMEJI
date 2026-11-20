@@ -2,6 +2,8 @@
 
 import type { AuthoredScene, Cue, KeywordScene, Segment } from "./types";
 
+/** Longest sentence shown whole (the scene shrinks it to fit). */
+const WHOLE = 24;
 const KANJI_OR_KATAKANA = /[一-鿿々]{2,}|[ァ-ヺー]{3,}/g;
 
 /** `食{た}べる` -> `食べる`. */
@@ -9,13 +11,18 @@ export function stripRuby(text: string): string {
   return text.replace(/\{[^}]*\}/g, "").replace(/[（(][぀-ゟ]+[）)]/g, "");
 }
 
-/** The cue's most telling word: the longest run of kanji or katakana, else its start. */
+/** The cue's most telling word: the longest run of kanji or katakana, else its first sentence. */
 export function keywordOf(text: string): string {
   const plain = stripRuby(text).replace(/\s+/g, "");
   const runs = plain.match(KANJI_OR_KATAKANA) ?? [];
   const best = runs.reduce((a, b) => (b.length > a.length ? b : a), "");
-  // No kanji or katakana: the first clause.
-  return best || plain.split(/[。、！？!?]/)[0].slice(0, 12) || plain.slice(0, 8);
+  if (best) return best;
+  // No kanji or katakana word: the first sentence whole, so it never ends mid-word
+  // ("女の人はこれからまずなに"); a very long one is cut at its first comma.
+  const sentence = plain.split(/[。！？!?]/)[0];
+  if (sentence.length <= WHOLE) return sentence || plain.slice(0, WHOLE);
+  const clause = sentence.split(/[、，,]/)[0];
+  return clause.length <= WHOLE ? clause : clause.slice(0, WHOLE);
 }
 
 function defaultScene(cue: Cue): KeywordScene {
