@@ -184,7 +184,7 @@ pub(crate) fn render_project(
 }
 
 /// `bai10.project.json` → `bai10.mp4`; `lesson.json` → `lesson.mp4`.
-fn default_output(project: &Path) -> PathBuf {
+pub(crate) fn default_output(project: &Path) -> PathBuf {
     let stem = project
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
