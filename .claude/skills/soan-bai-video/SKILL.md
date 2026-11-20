@@ -44,6 +44,17 @@ Sửa đến khi không còn `error`. Cảnh báo về furigana hoặc câu dài
 Rồi tự soát (hoặc giao một agent độc lập soát): ngữ pháp, cách đọc furigana, bản dịch, và đáp án luyện tập có đúng một đáp án đúng không.
 
 ## 5. Bàn giao để duyệt
-Báo đường dẫn hai file, số câu, thời lượng ước tính (≈ 5 s/câu + các pause), danh sách cảnh (cue → mẫu). Hỏi: **Duyệt và lồng tiếng (Đề xuất)** / Sửa. Chỉ khi người dùng duyệt mới chuyển sang bước dựng video (`opencut_ptc.py lesson --from-script ...`, R2).
+Báo đường dẫn hai file, số câu, thời lượng ước tính (≈ 5 s/câu + các pause), danh sách cảnh (cue → mẫu). Hỏi: **Duyệt và lồng tiếng (Đề xuất)** / Sửa. Chỉ khi người dùng duyệt mới dựng video. Chuẩn bị: textts REST chạy kèm ffmpeg trong PATH (không thì HTTP 500, MP3 rỗng), AivisSpeech bật, hình đã nằm trong `images/`. Dòng `## Tên chương` trong kịch bản là chương YouTube (cần ≥ 3).
+
+```bash
+python scripts/opencut_ptc.py lesson --script lessons/<ten>/<ten>.script.vi.txt --out lessons/<ten>     --karaoke --mascot apps/intro/public/avatars/chibi --render
+python scripts/lesson_audio.py mix lessons/<ten>/<ten>.mp4 -o lessons/<ten>/<ten>.final.mp4 --markers lessons/<ten>/<ten>.markers.json
+python scripts/lesson_qc.py video lessons/<ten>/<ten>.final.mp4
+node apps/intro/scripts/lesson.ts words lessons/<ten>/<ten>.project.json && python scripts/lesson_qc.py pron lessons/<ten>/<ten>.project.json --fix
+node apps/intro/scripts/lesson.ts thumbnail lessons/<ten>/<ten>.thumb.json
+node apps/intro/scripts/lesson.ts short lessons/<ten>/<ten>.visuals.json lessons/<ten>/<ten>.project.json --grammar <cue>
+```
+
+`pron --fix` báo dòng nghe lệch bản viết và thêm cách đọc vào từ điển textts; có lệch thì lồng tiếng lại. Giao agent độc lập soát ngữ pháp/dịch (`<ten>.review.md`) trước khi lồng tiếng. Đăng YouTube (unlisted, playlist) chỉ khi người dùng đồng ý sau khi xem bản cuối: `publish_youtube.py ... --dry-run` trước.
 
 Mẫu: `apps/intro/scenes/minna-05.script.vi.txt` + `minna-05.visuals.json`.

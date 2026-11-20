@@ -12,6 +12,9 @@
 //   bun run lesson check   <x.visuals.json> <x.project.json>   is the scenes file valid?
 //   (prompt and check also take the script, `x.script.vi.txt`, in place of the project:
 //    one cue per spoken line, so scenes can be written before the voice exists)
+//   bun run lesson thumbnail <thumb.json> [-o x.png]          1280x720 thumbnail: title, badge, chibi pose
+//   bun run lesson short   <x.visuals.json> <x.project.json> --grammar <cue> [-o x.mp4]
+//                                                              a vertical Short (< 60 s): that grammar scene + its examples
 //   bun run lesson whisper-setup                               fetches Whisper (once, ~150 MB)
 //   bun run lesson words   <x.project.json>                    when each token of the voice is said
 // --captions draws the subtitles into the picture, lit word by word.
@@ -191,6 +194,96 @@ async function openComposition(props: LessonProps) {
   return { serveUrl, composition, browserExecutable };
 }
 
+
+/** A composition by id, for the commands that are not the lesson body. */
+async function openById(id: string, props: Record<string, unknown>) {
+  const serveUrl = await bundle({ entryPoint: join(root, "src", "index.ts") });
+  const browserExecutable = process.env.REMOTION_BROWSER || null;
+  const composition = await selectComposition({ serveUrl, id, inputProps: props, browserExecutable, chromiumOptions, timeoutInMilliseconds });
+  return { serveUrl, composition, browserExecutable };
+}
+
+/** Copies a picture next to a scene into public/_lesson/ and returns where Remotion finds it. */
+function stagePicture(src: string, baseDir: string): string | undefined {
+  if (/^https?:\/\//.test(src) || existsSync(join(root, "public", src))) return src;
+  const file = resolve(baseDir, src);
+  if (!existsSync(file)) return undefined;
+  const name = `${createHash("sha1").update(file).digest("hex").slice(0, 8)}-${basename(file)}`;
+  mkdirSync(join(root, "public", "_lesson"), { recursive: true });
+  copyFileSync(file, join(root, "public", "_lesson", name));
+  return `_lesson/${name}`;
+}
+
+/** A thumbnail PNG from a small JSON: {"title","subtitle","badge","tag","pose"}. */
+async function thumbnail(jsonPath: string): Promise<string> {
+  const props = readJson<Record<string, unknown>>(jsonPath);
+  const out = resolve(option("-o") ?? jsonPath.replace(/\.json$/, "") + ".png");
+  const { serveUrl, composition, browserExecutable } = await openById("Thumbnail", props);
+  mkdirSync(dirname(out), { recursive: true });
+  await renderStill({ composition, serveUrl, output: out, frame: 0, inputProps: props, browserExecutable, chromiumOptions, timeoutInMilliseconds });
+  return out;
+}
+
+/**
+ * A vertical Short about one grammar point: the `grammar` scene at cue `--grammar`, then the
+ * `examples` scene that follows it. Picture only (silent); `shortAudio` cuts the voice for it.
+ */
+export function shortProps(visualsPath: string, projectPath: string, grammarCue: number): { props: Record<string, unknown>; from: number; to: number } {
+  const visuals = readJson<VisualsFile>(visualsPath);
+  const project = readJson<Project>(projectPath);
+  const cues: Cue[] = project.subtitles ?? [];
+  const scenes = [...(visuals.scenes ?? [])].sort((a, b) => a.cue - b.cue);
+  const gi = scenes.findIndex((s) => s.template === "grammar" && s.cue === grammarCue);
+  if (gi < 0) throw new Error(`no grammar scene at cue ${grammarCue}`);
+  const g = scenes[gi];
+  const ex = scenes[gi + 1];
+  if (g.template !== "grammar" || !ex || ex.template !== "examples") throw new Error(`the scene after the grammar one at cue ${grammarCue} must be "examples"`);
+  const last = Math.min((ex.until_cue ?? (scenes[gi + 2]?.cue ?? cues.length) - 1), cues.length - 1);
+  const from = cues[g.cue].start;
+  const to = cues[last].end + 0.8;
+  const dir = dirname(resolve(visualsPath));
+  const props = {
+    duration: Math.round((to - from) * 1000) / 1000,
+    title: g.title ?? "",
+    badge: option("--badge") ?? "N5",
+    parts: g.parts,
+    join: g.join,
+    note: g.note,
+    items: ex.items.map((it, i) => ({
+      text: it.text,
+      translation: it.translation,
+      picture: it.picture ? stagePicture(it.picture, dir) : undefined,
+      at: Math.max(0.3, (cues[Math.min(it.cue ?? ex.cue + i, cues.length - 1)].start - from)),
+    })),
+    footer: option("--footer"),
+  };
+  return { props, from, to };
+}
+
+async function shortVideo(visualsPath: string, projectPath: string): Promise<string> {
+  const grammarCue = Number(option("--grammar"));
+  if (!Number.isInteger(grammarCue)) throw new Error("--grammar <cue of the grammar scene> is required");
+  const { props, from, to } = shortProps(visualsPath, projectPath, grammarCue);
+  if ((props.duration as number) >= 60) throw new Error(`the clip is ${(props.duration as number).toFixed(1)} s: a Short must be under 60 s`);
+  const out = resolve(option("-o") ?? join(dirname(resolve(projectPath)), `${basename(projectPath).replace(/\.project\.json$|\.json$/, "")}.short-${grammarCue}.mp4`));
+  const silent = out.replace(/\.mp4$/, ".silent.mp4");
+  const { serveUrl, composition, browserExecutable } = await openById("Short", props);
+  mkdirSync(dirname(out), { recursive: true });
+  await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: silent, inputProps: props, browserExecutable, chromiumOptions, timeoutInMilliseconds, muted: true, logLevel: "error" });
+  const project = readJson<Project>(projectPath);
+  const audio = (project.audio ?? []).find((a) => a.duration);
+  if (!audio) throw new Error("the project has no voice to cut");
+  const shift = from - (audio.start ?? 0);
+  const mux = spawnSync(
+    "ffmpeg",
+    ["-y", "-loglevel", "error", "-i", silent, "-ss", String(Math.max(0, shift)), "-t", String(to - from), "-i", audio.path, "-af", "loudnorm=I=-16:TP=-1.0:LRA=11", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", out],
+    { stdio: "inherit" },
+  );
+  rmSync(silent, { force: true });
+  if (mux.status !== 0) throw new Error("ffmpeg could not add the voice");
+  return out;
+}
+
 async function preview(visualsPath: string, projectPath: string): Promise<string> {
   const props = buildProps(visualsPath, projectPath);
   const dir = resolve(option("-o") ?? join(root, "out", `${basename(visualsPath).replace(/\.visuals\.json$|\.json$/, "")}-preview`));
@@ -277,6 +370,10 @@ async function main() {
       for (const e of errors) console.log(`error: ${e}`);
       if (errors.length) process.exit(1);
       console.log(`${a}: ok (${warnings.length} warnings)`);
+    } else if (cmd === "thumbnail" && a) {
+      console.log(await thumbnail(resolve(a)));
+    } else if (cmd === "short" && a && b) {
+      console.log(await shortVideo(a, b));
     } else if (cmd === "whisper-setup") {
       await whisperSetup();
     } else if (cmd === "words" && a) {

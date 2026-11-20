@@ -122,6 +122,33 @@ bun run lesson preview ch193.visuals.json ch193.project.json               # loo
 
 The prompt carries the template schemas, the rules (no invented chart data, furigana, short text) and every cue with its translation. A reply that fails `check` is sent back once with the errors. `opencut_ptc.py lesson --visuals auto` does it in the lesson run. The lesson text goes to the Claude API: do not use it for material you may not send.
 
+## A lesson from a script (semi-automatic)
+
+Write the lesson first (the `soan-bai-video` skill does it with Claude Code): a script
+`x.script.vi.txt` (`[1] 日本語 // Tiếng Việt`, `## Chapter` lines, `[pause=5000]`), the scenes
+`x.visuals.json` and the pictures its `examples` cards name. Look it over, then:
+
+```sh
+node apps/intro/scripts/lesson.ts check x.visuals.json x.script.vi.txt     # scenes fit the script?
+python scripts/opencut_ptc.py lesson --script x.script.vi.txt --out lessons/x \
+    --karaoke --mascot apps/intro/public/avatars/chibi --render             # voice, scenes, chibi, video
+python scripts/lesson_audio.py mix lessons/x/x.mp4 -o lessons/x/x.final.mp4 \
+    --markers lessons/x/x.markers.json                                       # music (ducked), chimes, -16 LUFS
+python scripts/lesson_qc.py video lessons/x/x.final.mp4                      # size, codec, loudness
+node apps/intro/scripts/lesson.ts words lessons/x/x.project.json             # Whisper listens to the voice ...
+python scripts/lesson_qc.py pron lessons/x/x.project.json [--fix]            # ... lines that sound off; --fix teaches textts the readings
+node apps/intro/scripts/lesson.ts preview x.visuals.json lessons/x/x.project.json -o lessons/x/stills
+python scripts/lesson_qc.py layout lessons/x/stills                          # text outside the safe area?
+node apps/intro/scripts/lesson.ts thumbnail lessons/x/x.thumb.json           # 1280x720 PNG: title, badge, chibi pose
+node apps/intro/scripts/lesson.ts short x.visuals.json lessons/x/x.project.json --grammar 13   # vertical Short, < 60 s
+```
+
+Voices come from `scripts/lesson_voices.json` (role 1 まい, 2 fumifumi, 3 花音; change the
+voice ids to yours). `textts` must run with ffmpeg on its PATH, or it answers HTTP 500 and writes
+empty MP3s. The music and sounds in `assets/audio/` are synthesised by `lesson_audio.py make`
+(CC0, see `assets/audio/CREDITS.md`); `--bgm FILE` uses a recorded track instead.
+Pictures made with an image AI stay out of git (`scenes/images/*.png`).
+
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one

@@ -6,7 +6,7 @@ Standard library only. Needs an OAuth "Desktop app" client JSON from Google Clou
 
   python scripts/publish_youtube.py bai10.youtube.mp4 --client client_secret.json \
       --title "N4 第10課" --markers bai10.markers.json --captions bai10.vtt \
-      --playlist "N4 学習" [--privacy unlisted|private|public] [--description-file d.txt]
+      --playlist "N4 学習" [--thumbnail bai10.thumb.png] [--privacy unlisted|private|public] [--description-file d.txt]
 
 First run opens a browser to authorise; the token is cached in ~/.opencut/youtube_token.json.
 Default quota is ~6 uploads/day (1600 units each of 10000).
@@ -187,6 +187,7 @@ def main():
     a.add_argument("--markers", help="<name>.markers.json -> chapters")
     a.add_argument("--captions", action="append", default=[], help=".vtt/.srt (repeatable)")
     a.add_argument("--caption-lang", default="ja")
+    a.add_argument("--thumbnail", help="PNG/JPG (1280x720, < 2 MB); needs a verified channel, a refusal is only a warning")
     a.add_argument("--playlist")
     a.add_argument("--privacy", default="unlisted", choices=["unlisted", "private", "public"])
     a.add_argument("--tags", default="日本語,JLPT")
@@ -220,6 +221,14 @@ def main():
         request("POST", url, {"Authorization": f"Bearer {token}",
                            "Content-Type": f"multipart/related; boundary={boundary}"}, body)
         print("Caption uploaded:", c)
+    if o.thumbnail:
+        mime = "image/png" if o.thumbnail.lower().endswith(".png") else "image/jpeg"
+        try:
+            request("POST", f"{API}/upload/youtube/v3/thumbnails/set?videoId={vid}&uploadType=media",
+                    {"Authorization": f"Bearer {token}", "Content-Type": mime}, open(o.thumbnail, "rb").read())
+            print("Thumbnail set:", o.thumbnail)
+        except SystemExit as error:  # `request` exits on an HTTP error; the upload itself already worked
+            print("Thumbnail not set (the channel may need phone verification):", error)
     if o.playlist:
         pid = find_or_create_playlist(token, o.playlist, o.privacy if o.privacy != "public" else "unlisted")
         api(token, "POST", "/youtube/v3/playlistItems", {"part": "snippet"},

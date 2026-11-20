@@ -16,16 +16,16 @@
       "left": {
         "title": "行{い}きます: đi",
         "items": [
-          "Từ đây → ra kia",
-          "図書館{としょかん}へ行{い}きます"
+          "Từ đây → ra phía kia",
+          "Ví dụ: 行{い}きます"
         ],
         "tone": "pink"
       },
       "right": {
         "title": "来{き}ます / 帰{かえ}ります",
         "items": [
-          "Từ kia → về đây",
-          "家{いえ}へ帰{かえ}ります"
+          "来{き}ます: từ kia → đến chỗ mình",
+          "帰{かえ}ります: về nhà / về nước"
         ],
         "tone": "sky"
       }
@@ -95,7 +95,7 @@
           "tone": "navy"
         }
       ],
-      "note": "で chở bạn đến nơi"
+      "note": "で = phương tiện (đi bằng gì)"
     },
     {
       "template": "examples",
