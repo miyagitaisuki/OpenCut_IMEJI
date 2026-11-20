@@ -23,7 +23,7 @@ SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
 TOKEN_PATH = os.path.expanduser("~/.opencut/youtube_token.json")
 
 
-def http(method, url, headers=None, data=None, retries=4):
+def request(method, url, headers=None, data=None, retries=4):
     for attempt in range(retries):
         req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
         try:
@@ -44,7 +44,7 @@ def http(method, url, headers=None, data=None, retries=4):
 
 def post_form(url, form):
     body = urllib.parse.urlencode(form).encode()
-    _, _, out = http("POST", url, {"Content-Type": "application/x-www-form-urlencoded"}, body)
+    _, _, out = request("POST", url, {"Content-Type": "application/x-www-form-urlencoded"}, body)
     return json.loads(out)
 
 
@@ -129,7 +129,7 @@ def stamp(t):
 def upload(token, video, meta):
     auth = {"Authorization": f"Bearer {token}"}
     size = os.path.getsize(video)
-    _, h, _ = http("POST", f"{API}/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+    _, h, _ = request("POST", f"{API}/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
                    {**auth, "Content-Type": "application/json; charset=UTF-8",
                     "X-Upload-Content-Length": str(size), "X-Upload-Content-Type": "video/*"},
                    json.dumps(meta).encode())
@@ -140,7 +140,7 @@ def upload(token, video, meta):
             f.seek(pos)
             data = f.read(chunk)
             end = pos + len(data) - 1
-            st, h, out = http("PUT", loc, {"Content-Length": str(len(data)),
+            st, h, out = request("PUT", loc, {"Content-Length": str(len(data)),
                               "Content-Range": f"bytes {pos}-{end}/{size}"}, data)
             if st in (200, 201):
                 return json.loads(out)
@@ -157,7 +157,7 @@ def api(token, method, path, params, body=None, raw=None, ctype=None):
         data, h["Content-Type"] = json.dumps(body).encode(), "application/json"
     if ctype:
         h["Content-Type"] = ctype
-    _, _, out = http(method, url, h, data)
+    _, _, out = request(method, url, h, data)
     return json.loads(out) if out else {}
 
 
@@ -217,7 +217,7 @@ def main():
                 f"--{boundary}\r\nContent-Type: {mime}\r\n\r\n").encode() + open(c, "rb").read() \
                + f"\r\n--{boundary}--".encode()
         url = f"{API}/upload/youtube/v3/captions?uploadType=multipart&part=snippet"
-        http("POST", url, {"Authorization": f"Bearer {token}",
+        request("POST", url, {"Authorization": f"Bearer {token}",
                            "Content-Type": f"multipart/related; boundary={boundary}"}, body)
         print("Caption uploaded:", c)
     if o.playlist:
