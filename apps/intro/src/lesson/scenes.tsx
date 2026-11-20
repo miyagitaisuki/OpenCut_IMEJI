@@ -392,13 +392,13 @@ export const Keyword: React.FC<P<KeywordScene>> = ({ scene, duration }) => (
             maxWidth: SAFE.width,
           }}
         >
-          <Jp text={scene.keyword} style={{ fontSize: 130, fontWeight: 800, color: C.navy }} />
+          <Jp text={scene.keyword} style={{ fontSize: Math.round(Math.max(72, Math.min(130, (130 * 11) / Math.max(1, [...scene.keyword.replace(/\{[^}]*\}/g, "")].length)))), fontWeight: 800, color: C.navy }} />
         </div>
       </Pop>
       {scene.caption ? (
         <Pop at={0.5}>
           <div style={{ fontSize: 36, color: C.muted, fontWeight: 500, textAlign: "center", maxWidth: 1100, lineHeight: 1.4 }}>
-            {scene.caption.length > 90 ? scene.caption.slice(0, 88) + "…" : scene.caption}
+            {scene.caption}
           </div>
         </Pop>
       ) : null}
