@@ -242,7 +242,7 @@ def check_scenes(visuals: str, script: Path) -> list[str]:
 # ---- textts --------------------------------------------------------------
 
 
-def textts_dialogue(title: str, filename: str, script: str, roles: dict | None = None) -> dict:
+def textts_dialogue(title: str, filename: str, script: str, roles: dict | None = None, level: str | None = None) -> dict:
     body = {
         "title": title,
         "filename": filename,
@@ -251,6 +251,8 @@ def textts_dialogue(title: str, filename: str, script: str, roles: dict | None =
     }
     if roles:
         body["roles"] = roles
+    if level:  # N5 reads about 0.85x with longer pauses; N1 is almost natural speed
+        body["options"]["level"] = level
     result = http_json("POST", f"{TEXTTS_URL}/api/v1/dialogue", body)
     if not result.get("ok"):
         raise PtcError(f"textts refused the script: {result}")
@@ -372,7 +374,7 @@ def make_lesson(args: argparse.Namespace) -> dict:
     voices = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
     if from_script and voices.exists():
         roles = json.loads(voices.read_text(encoding="utf-8"))
-    result = textts_dialogue(args.title or name, name, script, roles)
+    result = textts_dialogue(args.title or name, name, script, roles, args.level)
     audio, srt, timeline = textts_outputs(result)
     opencut = find_opencut()
     project = out / f"{name}.project.json"
@@ -448,6 +450,8 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--question", type=int, action="append", help="QBank question id; repeat for several")
     lesson.add_argument("--script", metavar="SCRIPT_TXT",
                         help="A lesson script (`[1] 日本語 // Tiếng Việt`, `## Chapter`) instead of QBank questions")
+    lesson.add_argument("--level", choices=["N5", "N4", "N3", "N2", "N1"],
+                        help="textts reading speed and pauses for this learner level (N5 slowest)")
     lesson.add_argument("--voices", metavar="JSON",
                         help="With --script: role -> voice (default scripts/lesson_voices.json: 1 まい, 2 fumifumi, 3 花音)")
     lesson.add_argument("--chapter", type=int, help="QBank chapter id: every listening question in it")

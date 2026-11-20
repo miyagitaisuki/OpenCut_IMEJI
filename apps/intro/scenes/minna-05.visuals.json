@@ -119,7 +119,7 @@
           "picture": "images/airplane.png"
         }
       ],
-      "note": "Đi bộ: 歩{ある}いて行{い}きます (không dùng で)"
+      "note": "Phương tiện + で"
     },
     {
       "template": "grammar",
@@ -141,7 +141,7 @@
           "tone": "navy"
         }
       ],
-      "note": "と là người đi cùng mình"
+      "note": "と = người đi cùng mình"
     },
     {
       "template": "examples",
@@ -165,7 +165,7 @@
           "picture": "images/teacher.png"
         }
       ],
-      "note": "Đi một mình: 一人{ひとり}で (không có と)"
+      "note": "Trước と là người"
     },
     {
       "template": "grammar",
@@ -228,7 +228,7 @@
       "template": "dialogue",
       "cue": 32,
       "until_cue": 33,
-      "title": "Hội thoại",
+      "title": "Hội thoại (tiếp)",
       "layout": "bubbles",
       "lines": [
         {
@@ -271,7 +271,7 @@
       ],
       "answer": 1,
       "think": 5,
-      "explain": "Nắm tay mẹ cùng đi → と"
+      "explain": "Đi cùng mẹ → と"
     },
     {
       "template": "practice",
@@ -286,7 +286,7 @@
       ],
       "answer": 2,
       "think": 5,
-      "explain": "Mũi tên hướng về Nhật → へ"
+      "explain": "Mũi tên đi tới Nhật → へ"
     },
     {
       "template": "dialogue",

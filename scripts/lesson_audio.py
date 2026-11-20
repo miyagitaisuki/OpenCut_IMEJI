@@ -4,6 +4,9 @@
   python scripts/lesson_audio.py make                       # makes assets/audio/{bgm,sfx}/*.wav (once)
   python scripts/lesson_audio.py mix lesson.mp4 -o out.mp4 [--markers lesson.markers.json] [--bgm FILE]
 
+A music file dropped into assets/audio/bgm/ (mp3, m4a, ogg) is used in place of the generated pad,
+looped to the video's length; its licence is yours to check (it is git-ignored, so it never leaves your machine).
+
 `make` synthesises everything with ffmpeg's own generators: a soft looping chord pad
 and two short sounds (chapter chime, scene whoosh). Nothing is downloaded or sampled,
 so there is no licence to carry: the files are CC0 (public domain) by the author of
@@ -97,17 +100,23 @@ def chapter_times(markers: Path | None) -> list[float]:
     return sorted(float(m.get("time", m.get("at", 0))) for m in items if m.get("kind") == "chapter")
 
 
-def mix(video: Path, out: Path, bgm: Path | None, markers: Path | None, music_db: float = -14.0) -> Path:
+def user_music() -> Path | None:
+    """The first mp3/m4a/ogg dropped into assets/audio/bgm/ (it wins over the generated pad)."""
+    found = sorted(p for ext in ("mp3", "m4a", "ogg") for p in BGM.parent.glob(f"*.{ext}"))
+    return found[0] if found else None
+
+
+def mix(video: Path, out: Path, bgm: Path | None, markers: Path | None, music_db: float = 0.0) -> Path:
     exe = ffmpeg()
-    bgm = bgm or BGM
-    if not bgm.exists():
+    bgm = bgm or user_music() or BGM
+    if bgm == BGM and not bgm.exists():
         make()
     times = [t for t in chapter_times(markers) if t > 0.5]
     cmd = [exe, "-y", "-loglevel", "error", "-i", str(video), "-stream_loop", "-1", "-i", str(bgm)]
     parts = [
         # voice twice: one copy goes to the mix, one steers the compressor
         "[0:a]asplit=2[voice][key]",
-        f"[1:a]volume={music_db}dB[music]",
+        f"[1:a]loudnorm=I=-30:TP=-3:LRA=7,volume={music_db}dB[music]",  # any track lands at the same level
         "[music][key]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=600:makeup=1[ducked]",
     ]
     layers = ["[voice]", "[ducked]"]
@@ -134,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("-o", "--out", required=True)
     m.add_argument("--markers", help="<name>.markers.json: a chime at each chapter")
     m.add_argument("--bgm", help="A music file to use instead of the generated pad")
-    m.add_argument("--music-db", type=float, default=-14.0, help="Music level before ducking (default -14 dB; the pad itself is about -20 dB RMS)")
+    m.add_argument("--music-db", type=float, default=0.0, help="Music level before ducking, relative to -30 LUFS (default 0)")
     args = parser.parse_args(argv)
     try:
         if args.command == "make":
