@@ -69,7 +69,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # so `youtube_quota` imports when run from elsewhere
 import youtube_quota  # noqa: E402
 
-REPO = Path(__file__).resolve().parent.parent
+FROZEN = bool(getattr(sys, "frozen", False))  # the one-file exe (PyInstaller)
+# The repo: OPENCUT_REPO, else the folder the exe sits in (the exe is in the repo root or dist/), else the
+# parent of scripts/.
+REPO = Path(os.environ["OPENCUT_REPO"]).resolve() if os.environ.get("OPENCUT_REPO") else (
+    Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent.parent)
 SCRIPTS = REPO / "scripts"
 LESSONS = REPO / "lessons"
 JOBS_DIR = LESSONS / "_jobs"
@@ -405,7 +409,9 @@ class Runner:
         return "".join(lines)
 
     def _py(self, script: str, *args: str) -> list[str]:
-        return [sys.executable, str(SCRIPTS / script), *args]
+        # The exe cannot run the scripts itself: they need a Python interpreter (OPENCUT_PYTHON, else `python`).
+        python = os.environ.get("OPENCUT_PYTHON") or ("python" if FROZEN else sys.executable)
+        return [python, str(SCRIPTS / script), *args]
 
     def _lesson_args(self, spec: dict, out: Path) -> tuple[list[str], list[Path] | None]:
         """The options every stage of a job gets (the stage flag is added per call). Returns the command and,
@@ -751,11 +757,18 @@ def main(argv: list[str] | None = None) -> int:
     serve = sub.add_parser("serve", help="Run the job server")
     serve.add_argument("--port", type=int, default=int(os.environ.get("LESSON_JOBS_PORT", "8790")))
     serve.add_argument("--host", default="127.0.0.1")
-    args = parser.parse_args(argv)
+    serve.add_argument("--open", action="store_true", default=FROZEN,
+                       help="Open the dashboard in the browser (default for the exe)")
+    args = parser.parse_args(argv if argv is not None else (sys.argv[1:] or ["serve"]))  # no command: serve
     store = Store(JOBS_DIR)
     runner = Runner(store)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(store, runner))
-    print(f"lesson jobs on http://{args.host}:{args.port} (state in {JOBS_DIR})", file=sys.stderr)
+    url = f"http://{args.host}:{args.port}"
+    print(f"lesson jobs on {url} (state in {JOBS_DIR})", file=sys.stderr)
+    print(f"dashboard: {url}/dashboard   (Ctrl+C stops the server)", file=sys.stderr)
+    if args.open:
+        import webbrowser
+        threading.Timer(1.0, webbrowser.open, args=[f"{url}/dashboard"]).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

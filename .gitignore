@@ -26,3 +26,6 @@ assets/audio/**/*.wav
 assets/audio/bgm/*.mp3
 assets/audio/bgm/*.m4a
 assets/audio/bgm/*.ogg
+
+# one-file launcher for the lesson queue (built with PyInstaller; see scripts/lesson_jobs.py)
+OpenCutLessons.exe
