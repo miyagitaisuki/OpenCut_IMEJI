@@ -93,14 +93,14 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) 
 - Hướng dẫn cài Windows: [HUONG-DAN-WINDOWS.md](HUONG-DAN-WINDOWS.md)
 - Pipeline bài giảng: `scripts/opencut_ptc.py`, `scripts/lesson_jobs.py`, `scripts/lesson_qc.py`
 
-## 7. Trạng thái các bước (cập nhật sau phiên này)
+## 7. Trạng thái các bước
 
-- **Bước 1**: xong (PR #21, #22, #23 đã merge; không cần tách lại).
-- **Bước 2**: xong. SQLite + hash theo stage, tách tts/scenes/render, quarantine và `accept`, `retry {"force": true}`, cache theo câu cho bước nghe lại (`<name>.qc-lines.json`).
-- **Bước 3**: xong phần code (quota theo ngày Pacific, `waiting_quota`, `--publish-at`). Chưa upload thật. Trạng thái audit OAuth không kiểm tra được qua API.
-- **Bước 4**: quyết định: giữ Whisper cho timing từ/chữ. textts chỉ trả timeline theo câu (`start_ms`/`end_ms`), không có mốc mora hay từ, nên không thay được.
-- **Bước 5**: xong. `scene_spec.schema.json` là SceneSpec; Claude trả đầu ra qua tool `submit_scenes` (structured output); kiểm tra bằng `validate_spec` (stdlib) và `lesson check`; sai sau 2 lượt thì exit 3 và job vào `quarantine`.
-- **Bước 6**: đang đo. `scripts/homograph_eval.json` và `scripts/eval_homographs.py` (cần fugashi + unidic-lite, dùng Python 3.10): 10/12 đúng. Sai: 市場 (いちば) và 辛い (からい). Chưa áp dụng vào pipeline.
-- **Bước 7**: một phần. Thumbnail (Remotion renderStill) đã nối vào job trước bước publish dry-run; lỗi chỉ ghi cảnh báo. Chưa tách hằng số vùng an toàn Shorts.
-- **Bước 8**: chưa làm. Cần đo encoder trên máy thật; `libx264` là GPL, xem lại NOTICES.md trước.
-- **Bước 9**: MCP `submit_lesson_job`, `get_job_status`, `list_quarantine` đã có (apps/cli, gọi HTTP tới job server). Chưa có tool đăng video. Dashboard cần quyết định công nghệ.
+- **Bước 1**: xong (PR #21, #22, #23 đã merge).
+- **Bước 2**: xong (SQLite, hash theo stage, tách tts/scenes/render, quarantine, cache theo câu cho bước nghe lại).
+- **Bước 3**: xong. Upload, quota theo ngày, lên lịch (`--publish-at`) đã làm và đã kiểm tra với OAuth thật.
+- **Bước 4**: quyết định giữ Whisper cho timing từ/chữ. textts chỉ có mốc theo câu.
+- **Bước 5**: xong (SceneSpec, structured output, quarantine khi sai sau 2 lượt).
+- **Bước 6**: đang đo, chưa áp dụng. `scripts/eval_homographs.py`: 10/12 đúng với fugashi/UniDic. Sai: 市場, 辛い.
+- **Bước 7**: xong phần thumbnail (nối vào job) và vùng an toàn Shorts (`apps/intro/src/lesson/shorts.ts`, có test).
+- **Bước 8**: đo xong encoder (`scripts/bench_encoders.py`). Gộp audio và ducking đã là một đồ thị FFmpeg và video copy (`lesson_audio.py mix`). Chưa đo độ sụt tiếng nhạc khi ducking.
+- **Bước 9**: xong. MCP `submit_lesson_job`, `get_job_status`, `list_quarantine`; dashboard `/dashboard` (màu cam Claude). Chưa làm: nghe đoạn `pron` và nhập cách đọc ghi đè.
