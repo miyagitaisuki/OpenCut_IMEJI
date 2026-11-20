@@ -10,6 +10,12 @@ Turns listening questions stored in QBank into a lesson video:
      `question` marker per question (`ref` = `qbank:<id>`);
   4. optionally `opencut render` (with `--render`).
 
+Or, from a lesson script written and approved beforehand (`--script`, see the
+`soan-bai-video` skill): `<name>.script.vi.txt` has one `[role] 日本語 // Tiếng Việt`
+line per sentence and `## Title` lines for the chapters. `<name>.visuals.json`
+next to it (or `--visuals`) gives the scenes; it is checked against the script
+before anything is voiced.
+
 Environment: QBANK_URL (default http://127.0.0.1:8765), TEXTTS_URL (default
 http://127.0.0.1:8000), OPENCUT_BIN (default `opencut` on PATH, else
 target/release|debug/opencut under the repo).
@@ -19,6 +25,8 @@ Examples:
   python scripts/opencut_ptc.py lesson --question 7323 --question 7514 \
       --out lessons/n2-nghe --render --burn-subtitles
   python scripts/opencut_ptc.py lesson --chapter 193 --limit 5 --out lessons/ch193
+  python scripts/opencut_ptc.py lesson --script lessons/minna-05/minna-05.script.vi.txt \
+      --out lessons/minna-05 --karaoke --mascot apps/intro/public/avatars/chibi --render
 """
 from __future__ import annotations
 
@@ -143,20 +151,109 @@ def build_script(questions: list[dict]) -> tuple[str, str, list[int]]:
     return "\n".join(plain) + "\n", "\n".join(translated) + "\n", starts
 
 
+def parse_lesson_script(path: Path) -> tuple[str, str, list[tuple[str, int]]]:
+    """A lesson script -> (script for textts, script with ` // translation` for OpenCut,
+    chapters as (title, index of the first spoken line)). `#` lines are comments; `## Title`
+    starts a chapter at the next spoken line."""
+    plain: list[str] = []
+    translated: list[str] = []
+    chapters: list[tuple[str, int]] = []
+    speech = 0
+    pending: str | None = None
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.rstrip()
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("##"):
+            pending = stripped.lstrip("#").strip()
+            continue
+        if stripped.startswith("#"):
+            continue
+        if _is_speech(line):
+            if pending is not None:
+                chapters.append((pending, speech))
+                pending = None
+            plain.append(line.split(" // ", 1)[0].rstrip())
+            translated.append(line)
+            speech += 1
+        else:  # [pause=...], [sfx=...], [bgm=...]
+            plain.append(line)
+            translated.append(line)
+    if not speech:
+        raise PtcError(f"{path}: no spoken lines")
+    return "\n".join(plain) + "\n", "\n".join(translated) + "\n", chapters
+
+
+def add_chapter_markers(project_path: Path, chapters: list[tuple[str, int]]) -> int:
+    """One `chapter` marker per chapter, at its first spoken line's cue; the first one at 0:00 (YouTube needs it)."""
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    cues = project.get("subtitles", [])
+    markers = project.setdefault("markers", [])
+    for n, (title, first_line) in enumerate(chapters):
+        if first_line >= len(cues):
+            raise PtcError(f"chapter {title!r} starts at line {first_line}, but the project has {len(cues)} subtitles")
+        markers.append({"time": 0.0 if n == 0 else round(cues[first_line]["start"], 3), "kind": "chapter", "label": title})
+    markers.sort(key=lambda m: m["time"])
+    project_path.write_text(json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return len(chapters)
+
+
+def apply_chapters(script: Path, project_path: Path) -> int:
+    """Puts the script's `##` chapters in a project that is already voiced (no new voice or render), and
+    rewrites `<name>.markers.json` beside it, as `opencut render` does."""
+    _, _, chapters = parse_lesson_script(script)
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    project["markers"] = [m for m in project.get("markers", []) if m.get("kind") != "chapter"]
+    project_path.write_text(json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    add_chapter_markers(project_path, chapters)
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    clips = [a for a in project.get("audio", []) if a.get("duration")]
+    duration = max((a.get("start", 0) + a["duration"] for a in clips), default=0)
+    out = project_path.with_name(re.sub(r"\.project\.json$|\.json$", "", project_path.name) + ".markers.json")
+    out.write_text(json.dumps({"title": project.get("title", ""), "duration_seconds": duration, "markers": project["markers"]},
+                              ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return len(chapters)
+
+
+def lesson_node(*args: str) -> subprocess.CompletedProcess:
+    node = shutil.which("node")
+    if not node:
+        raise PtcError("needs Node.js (node 22+ on PATH)")
+    script = REPO / "apps" / "intro" / "scripts" / "lesson.ts"
+    env = dict(os.environ)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:  # `lesson words` calls ffmpeg: textts ships one
+        for found in Path(os.environ.get("LOCALAPPDATA", "")).glob("Programs/textts-gui/resources/ffmpeg"):
+            env["PATH"] = f"{found}{os.pathsep}{env.get('PATH', '')}"
+    return subprocess.run([node, str(script), *args], cwd=script.parent.parent, env=env,
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def check_scenes(visuals: str, script: Path) -> list[str]:
+    """`lesson check` of the scenes against the (unvoiced) script: returns its warnings; errors raise."""
+    done = lesson_node("check", str(Path(visuals).resolve()), str(script.resolve()))
+    text = (done.stdout + done.stderr).strip()
+    if done.returncode != 0:
+        raise PtcError("the scenes do not fit the script:\n" + text)
+    return [l for l in text.splitlines() if l.startswith("warning")]
+
+
 # ---- textts --------------------------------------------------------------
 
 
-def textts_dialogue(title: str, filename: str, script: str) -> dict:
-    result = http_json(
-        "POST",
-        f"{TEXTTS_URL}/api/v1/dialogue",
-        {
-            "title": title,
-            "filename": filename,
-            "script": script,
-            "options": {"srt": True, "slow": False, "worksheet": False, "format": "mp3"},
-        },
-    )
+def textts_dialogue(title: str, filename: str, script: str, roles: dict | None = None, level: str | None = None) -> dict:
+    body = {
+        "title": title,
+        "filename": filename,
+        "script": script,
+        "options": {"srt": True, "slow": False, "worksheet": False, "format": "mp3"},
+    }
+    if roles:
+        body["roles"] = roles
+    if level:  # N5 reads about 0.85x with longer pauses; N1 is almost natural speed
+        body["options"]["level"] = level
+    result = http_json("POST", f"{TEXTTS_URL}/api/v1/dialogue", body)
     if not result.get("ok"):
         raise PtcError(f"textts refused the script: {result}")
     return result
@@ -197,12 +294,13 @@ def run(cmd: list[str]) -> None:
 
 def apply_visuals(project: Path, visuals: str, karaoke: bool = False) -> None:
     """Renders the lesson's scenes (apps/intro `lesson build`) and makes them the project's picture."""
-    node = shutil.which("node")
-    if not node:
-        raise PtcError("--visuals needs Node.js (node 22+ on PATH)")
-    script = REPO / "apps" / "intro" / "scripts" / "lesson.ts"
-    done = subprocess.run([node, str(script), "build", str(Path(visuals).resolve()), str(project.resolve())],
-                          cwd=script.parent.parent, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if karaoke:
+        # Listen to the voice first, so each word lights up when it is said.
+        done = lesson_node("words", str(project.resolve()))
+        if done.returncode != 0:
+            raise PtcError("lesson words failed (run `node apps/intro/scripts/lesson.ts whisper-setup` once):\n"
+                           + (done.stderr.strip() or done.stdout.strip()))
+    done = lesson_node("build", str(Path(visuals).resolve()), str(project.resolve()), *(["--captions"] if karaoke else []))
     if done.returncode != 0:
         raise PtcError("lesson visuals failed:\n" + (done.stderr.strip() or done.stdout.strip()))
 
@@ -231,26 +329,52 @@ def add_question_markers(project_path: Path, questions: list[dict], starts: list
 
 
 def make_lesson(args: argparse.Namespace) -> dict:
-    if args.question:
+    chapters: list[tuple[str, int]] = []
+    from_script = Path(args.script).resolve() if args.script else None
+    if from_script:
+        if not from_script.exists():
+            raise PtcError(f"no such script: {from_script}")
+        questions: list[dict] = []
+    elif args.question:
         questions = [qbank_question(i) for i in args.question]
     elif args.chapter is not None:
         questions = qbank_chapter_questions(args.chapter, args.limit)
     else:
         raise PtcError("give --question <id> (repeatable) or --chapter <id>")
-    if not questions:
+    if not questions and not from_script:
         raise PtcError("no listening questions found")
 
-    script, script_tr, starts = build_script(questions)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     name = args.name or out.name
+    warnings: list[str] = []
+    if from_script:
+        script, script_tr, chapters = parse_lesson_script(from_script)
+        starts: list[int] = []
+        base = re.sub(r"\.script(\.vi)?\.txt$|\.txt$", "", from_script.name)
+        if not args.visuals:
+            sibling = from_script.with_name(f"{base}.visuals.json")
+            if sibling.exists():
+                args.visuals = str(sibling)
+        if args.visuals and args.visuals != "auto":
+            # Before any voice is made: scenes that do not fit the script are found here, not after a render.
+            warnings = check_scenes(args.visuals, from_script)
+    else:
+        script, script_tr, starts = build_script(questions)
     (out / f"{name}.script.txt").write_text(script, encoding="utf-8")
-    translated_path = out / f"{name}.script.vi.txt"
+    # With --script the input is never overwritten (it may live in this folder and holds the `##` chapter
+    # lines); what OpenCut imports is a cleaned copy beside it.
+    translated_path = out / (f"{name}.import.txt" if from_script else f"{name}.script.vi.txt")
     translated_path.write_text(script_tr, encoding="utf-8")
     if args.dry_run:
-        return {"dry_run": True, "questions": [q["id"] for q in questions], "script": str(out / f"{name}.script.txt")}
+        return {"dry_run": True, "questions": [q["id"] for q in questions], "chapters": [c[0] for c in chapters],
+                "warnings": warnings, "script": str(out / f"{name}.script.txt")}
 
-    result = textts_dialogue(args.title or name, name, script)
+    roles = None
+    voices = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
+    if from_script and voices.exists():
+        roles = json.loads(voices.read_text(encoding="utf-8"))
+    result = textts_dialogue(args.title or name, name, script, roles, args.level)
     audio, srt, timeline = textts_outputs(result)
     opencut = find_opencut()
     project = out / f"{name}.project.json"
@@ -281,7 +405,9 @@ def make_lesson(args: argparse.Namespace) -> dict:
         run([opencut, "mascot", str(project), "--avatar", args.mascot])
 
     # Cue times already include any intro, so markers follow the project.
-    markers = add_question_markers(project, questions, starts)
+    markers = add_question_markers(project, questions, starts) if questions else 0
+    if chapters:
+        markers += add_chapter_markers(project, chapters)
 
     video = None
     if args.render:
@@ -317,8 +443,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="Check that QBank, textts and opencut are reachable")
+    chap = sub.add_parser("chapters", help="Put a script's ## chapters into an already voiced project")
+    chap.add_argument("--script", required=True)
+    chap.add_argument("--project", required=True)
     lesson = sub.add_parser("lesson", help="Listening questions from QBank -> lesson project (and video)")
     lesson.add_argument("--question", type=int, action="append", help="QBank question id; repeat for several")
+    lesson.add_argument("--script", metavar="SCRIPT_TXT",
+                        help="A lesson script (`[1] 日本語 // Tiếng Việt`, `## Chapter`) instead of QBank questions")
+    lesson.add_argument("--level", choices=["N5", "N4", "N3", "N2", "N1"],
+                        help="textts reading speed and pauses for this learner level (N5 slowest)")
+    lesson.add_argument("--voices", metavar="JSON",
+                        help="With --script: role -> voice (default scripts/lesson_voices.json: 1 まい, 2 fumifumi, 3 花音)")
     lesson.add_argument("--chapter", type=int, help="QBank chapter id: every listening question in it")
     lesson.add_argument("--limit", type=int, default=0, help="With --chapter: at most this many questions")
     lesson.add_argument("--out", required=True, help="Output folder")
@@ -342,6 +477,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "check":
             return check()
+        if args.command == "chapters":
+            print(f"{apply_chapters(Path(args.script), Path(args.project))} chapters")
+            return 0
         print(json.dumps(make_lesson(args), ensure_ascii=False, indent=2))
         return 0
     except PtcError as error:

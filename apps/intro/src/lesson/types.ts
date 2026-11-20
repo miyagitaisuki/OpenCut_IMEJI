@@ -95,8 +95,21 @@ export type PracticeScene = Timing & {
   explain?: string;
 };
 
+/**
+ * Example sentences, one card each (picture + Japanese + Vietnamese). Each card pops
+ * in when its sentence is read: card i at cue `scene.cue + i`, or at `items[i].cue`.
+ */
+export type ExamplesScene = Timing & {
+  template: "examples";
+  title?: string;
+  /** One to four examples. */
+  items: { text: string; translation?: string; picture?: string; cue?: number }[];
+  note?: string;
+};
+
 export type LessonScene =
   | TitleScene
+  | ExamplesScene
   | PracticeScene
   | ImageScene
   | GrammarScene
@@ -119,6 +132,8 @@ export type Segment = {
   end: number;
   /** First and last cue the segment covers. */
   cues: [number, number];
+  /** When each of those cues starts, in seconds from the segment start. */
+  beats?: number[];
   scene: LessonScene;
 };
 

@@ -49,3 +49,9 @@ test("cues no scene covers get a keyword scene", () => {
 test("a cue out of range is an error", () => {
   expect(() => planScenes(cues, [title(9)], 3, 20)).toThrow(/cue 9/);
 });
+
+test("each segment knows when its cues start", () => {
+  const cues = [0, 2, 5, 9].map((s, i) => ({ start: 10 + s, end: 10 + s + 2, text: `c${i}` }));
+  const segs = planScenes(cues, [{ template: "examples", cue: 1, until_cue: 3, items: [{ text: "a" }, { text: "b" }, { text: "c" }] }], 10, 12);
+  expect(segs[1].beats).toEqual([0, 3, 7]);
+});
