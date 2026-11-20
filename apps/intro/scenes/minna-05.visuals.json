@@ -22,7 +22,7 @@
         "tone": "pink"
       },
       "right": {
-        "title": "来{き}ます / 帰{かえ}ります",
+        "title": "来{き}ます: đến / 帰{かえ}ります: về",
         "items": [
           "来{き}ます: từ kia → đến chỗ mình",
           "帰{かえ}ります: về nhà / về nước"
@@ -114,8 +114,8 @@
           "picture": "images/bicycle.png"
         },
         {
-          "text": "飛行機{ひこうき}で日本{にほん}へ来{き}ました。",
-          "translation": "Tôi đã đến Nhật bằng máy bay.",
+          "text": "飛行機{ひこうき}で日本{にほん}へ来{き}ます。",
+          "translation": "Tôi sẽ đến Nhật bằng máy bay.",
           "picture": "images/airplane.png"
         }
       ],
@@ -155,8 +155,8 @@
           "picture": "images/cinema.png"
         },
         {
-          "text": "家族{かぞく}と日本{にほん}へ来{き}ました。",
-          "translation": "Tôi đã đến Nhật cùng gia đình.",
+          "text": "家族{かぞく}と日本{にほん}へ来{き}ます。",
+          "translation": "Tôi sẽ đến Nhật cùng gia đình.",
           "picture": "images/family.png"
         },
         {
