@@ -18,6 +18,8 @@ Endpoints (JSON in and out; listens on 127.0.0.1 only):
   GET  /jobs/<id>            one job (stages, outputs, error)
   GET  /jobs/<id>/log        the job's log (text)
   POST /jobs/<id>/cancel     drop a queued job or stop a running one
+  POST /jobs/<id>/retry      requeue a failed, cancelled or quarantined job; body {"force": true} reruns every stage
+  POST /jobs/<id>/accept     a quarantined job, reviewed by a person: continue to mix, QC and the publish check
   POST /jobs/<id>/publish    upload to YouTube (job must be `awaiting_approval`)
   GET  /health
 
@@ -35,8 +37,9 @@ plus options: "name" (folder under lessons/, required with "script"), "title", "
 POST /jobs/<id>/publish body: {"client": "path/to/oauth-client.json"} (or $YOUTUBE_CLIENT); may override
 any "publish" field. The OAuth consent opens in a browser the first time.
 
-State lives in lessons/_jobs/<id>/ (job.json, job.log), so jobs survive a restart; a job that was
-running when the server stopped is marked failed.
+State lives in lessons/_jobs/jobs.db (SQLite, WAL) and each job's log in lessons/_jobs/<id>/job.log, so
+jobs survive a restart; a job that was running when the server stopped is marked failed. Each stage stores
+an input hash: a retry (or a rebuild after a small edit) skips a stage whose inputs did not change.
 
 Environment: LESSON_JOBS_PORT (default 8790), plus what the steps need (QBANK_URL, TEXTTS_URL,
 OPENCUT_BIN, ANTHROPIC_API_KEY for auto scenes).
@@ -47,10 +50,13 @@ OPENCUT_BIN, ANTHROPIC_API_KEY for auto scenes).
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import json
 import os
 import queue
 import re
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -59,59 +65,105 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # so `youtube_quota` imports when run from elsewhere
+import youtube_quota  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
 LESSONS = REPO / "lessons"
 JOBS_DIR = LESSONS / "_jobs"
 DEFAULT_MASCOT = "apps/intro/public/avatars/chibi"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-STAGES = ("build", "mix", "qc", "publish")
+STAGES = ("tts", "scenes", "render", "mix", "qc", "publish")
 
 
 class JobError(RuntimeError):
     pass
 
 
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS jobs (
+    id      TEXT PRIMARY KEY,
+    status  TEXT NOT NULL,
+    spec    TEXT NOT NULL,
+    outputs TEXT NOT NULL,
+    error   TEXT,
+    created REAL NOT NULL,
+    updated REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS stages (
+    job_id     TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    stage      TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    input_hash TEXT,
+    info       TEXT NOT NULL,
+    PRIMARY KEY (job_id, stage)
+);
+"""
+
+
 class Store:
-    """Jobs in memory, mirrored to lessons/_jobs/<id>/job.json."""
+    """Jobs in SQLite (WAL) at lessons/_jobs/jobs.db: one row per job, one per stage. get() and all()
+    return the dict shape the HTTP API serves. Each job's log stays a plain file (job.log)."""
 
     def __init__(self, root: Path):
         self.root = root
-        self.lock = threading.Lock()
-        self.jobs: dict[str, dict] = {}
+        self.lock = threading.RLock()
         root.mkdir(parents=True, exist_ok=True)
-        for path in root.glob("*/job.json"):
+        self.db = sqlite3.connect(root / "jobs.db", check_same_thread=False, timeout=10)
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.executescript(SCHEMA)
+        for path in root.glob("*/job.json"):  # jobs written before the SQLite store
             try:
                 job = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            if job.get("status") in ("running", "publishing"):
+            if self.get(job["id"]) is None:
+                self.save(job)
+        for job in self.all():
+            if job["status"] in ("running", "publishing"):
                 job["status"] = "failed"
                 job["error"] = "the server stopped while this job was running"
-                self._write(job)
-            self.jobs[job["id"]] = job
-
-    def _write(self, job: dict) -> None:
-        folder = self.root / job["id"]
-        folder.mkdir(parents=True, exist_ok=True)
-        tmp = folder / "job.json.tmp"
-        tmp.write_text(json.dumps(job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        tmp.replace(folder / "job.json")
+                self.save(job)
 
     def save(self, job: dict) -> None:
-        with self.lock:
+        with self.lock, self.db:
             job["updated"] = time.time()
-            self.jobs[job["id"]] = job
-            self._write(job)
+            self.db.execute(
+                "INSERT INTO jobs (id, status, spec, outputs, error, created, updated) VALUES (?,?,?,?,?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET status=excluded.status, spec=excluded.spec, "
+                "outputs=excluded.outputs, error=excluded.error, updated=excluded.updated",
+                (job["id"], job["status"], json.dumps(job["spec"], ensure_ascii=False),
+                 json.dumps(job["outputs"], ensure_ascii=False), job.get("error"), job["created"], job["updated"]),
+            )
+            for stage, info in job["stages"].items():
+                self.db.execute(
+                    "INSERT INTO stages (job_id, stage, status, input_hash, info) VALUES (?,?,?,?,?) "
+                    "ON CONFLICT(job_id, stage) DO UPDATE SET status=excluded.status, "
+                    "input_hash=excluded.input_hash, info=excluded.info",
+                    (job["id"], stage, info.get("status", "pending"), info.get("input_hash"),
+                     json.dumps(info, ensure_ascii=False)),
+                )
+
+    def _row(self, job_id: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT id, status, spec, outputs, error, created, updated FROM jobs WHERE id=?", (job_id,)).fetchone()
+        if row is None:
+            return None
+        found = {s: json.loads(info) for s, info in
+                 self.db.execute("SELECT stage, info FROM stages WHERE job_id=?", (job_id,))}
+        return {"id": row[0], "status": row[1], "spec": json.loads(row[2]), "outputs": json.loads(row[3]),
+                "error": row[4], "created": row[5], "updated": row[6],
+                "stages": {s: found[s] for s in STAGES if s in found}}
 
     def get(self, job_id: str) -> dict | None:
         with self.lock:
-            job = self.jobs.get(job_id)
-            return json.loads(json.dumps(job)) if job else None
+            return self._row(job_id)
 
     def all(self) -> list[dict]:
         with self.lock:
-            return sorted((dict(j) for j in self.jobs.values()), key=lambda j: j["created"], reverse=True)
+            ids = [r[0] for r in self.db.execute("SELECT id FROM jobs ORDER BY created DESC")]
+            return [self._row(i) for i in ids]
 
     def log_path(self, job_id: str) -> Path:
         return self.root / job_id / "job.log"
@@ -188,10 +240,13 @@ class Runner:
         self.queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self.current: dict[str, subprocess.Popen] = {}
         self.cancelled: set[str] = set()
+        self.quota = youtube_quota.Ledger()
+        waiting = {"queued": "build", "queued_finish": "finish", "queued_publish": "publish"}
         for job in reversed(store.all()):
-            if job["status"] == "queued":
-                self.queue.put(("build", job["id"]))
+            if job["status"] in waiting:
+                self.queue.put((waiting[job["status"]], job["id"]))
         threading.Thread(target=self._loop, daemon=True).start()
+        threading.Thread(target=self._scheduler, daemon=True).start()
 
     def submit(self, spec: dict) -> dict:
         now = time.time()
@@ -211,10 +266,27 @@ class Runner:
         client = overrides.pop("client", None) or os.environ.get("YOUTUBE_CLIENT")
         if not client or not Path(client).is_file():
             raise JobError("give client (OAuth client JSON path) or set $YOUTUBE_CLIENT")
+        if overrides.get("publish_at"):
+            try:
+                dt.datetime.fromisoformat(overrides["publish_at"])
+            except (TypeError, ValueError) as error:
+                raise JobError("publish_at must be an ISO 8601 time, e.g. 2026-11-25T09:00:00+09:00") from error
         job["spec"]["publish"] = {**job["spec"]["publish"], **overrides, "client": client}
         job["status"] = "queued_publish"
         self.store.save(job)
         self.queue.put(("publish", job_id))
+        return job
+
+    def accept(self, job_id: str) -> dict:
+        """A person reviewed a quarantined job and accepts it: mix, QC and the publish dry run follow."""
+        job = self.store.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        if job["status"] != "quarantine":
+            raise JobError(f"job is {job['status']}, not quarantine")
+        job["status"] = "queued_finish"
+        self.store.save(job)
+        self.queue.put(("finish", job_id))
         return job
 
     def cancel(self, job_id: str) -> dict:
@@ -227,22 +299,56 @@ class Runner:
         proc = self.current.get(job_id)
         if proc and proc.poll() is None:
             proc.terminate()
-        if job["status"] in ("queued", "awaiting_approval", "queued_publish"):
+        if job["status"] in ("queued", "awaiting_approval", "queued_publish", "queued_finish", "quarantine", "waiting_quota"):
             job["status"] = "cancelled"
             self.store.save(job)
         return job
 
+    def retry(self, job_id: str, force: bool = False) -> dict:
+        """Requeues a failed, cancelled or quarantined job. Stages that finished ("done") keep their result and
+        _cached() skips them when their inputs still match; force=True reruns every stage."""
+        job = self.store.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        if job["status"] not in ("failed", "cancelled", "quarantine"):
+            raise JobError(f"job is {job['status']}; only failed, cancelled or quarantined jobs can be retried")
+        self.cancelled.discard(job_id)
+        for stage, info in job["stages"].items():
+            if force or info.get("status") != "done":
+                job["stages"][stage] = {"status": "pending"}
+        job.update(status="queued", error=None)
+        self.store.save(job)
+        self.queue.put(("build", job_id))
+        return job
+
     # -- worker --------------------------------------------------------------------------------
+
+    def _scheduler(self) -> None:
+        """Puts jobs that waited for the YouTube quota back in the queue once the quota has reset."""
+        while True:
+            time.sleep(60)
+            now = dt.datetime.now(dt.timezone.utc)
+            for job in self.store.all():
+                if job["status"] != "waiting_quota":
+                    continue
+                if now >= dt.datetime.fromisoformat(job["outputs"]["quota_retry_after"]):
+                    job["status"] = "queued_publish"
+                    self.store.save(job)
+                    self.queue.put(("publish", job["id"]))
 
     def _loop(self) -> None:
         while True:
             kind, job_id = self.queue.get()
             job = self.store.get(job_id)
-            if not job or job_id in self.cancelled or job["status"] == "cancelled":
+            # A stale queue entry (cancelled, or requeued by retry) must not run a job twice.
+            expected = {"build": "queued", "finish": "queued_finish", "publish": "queued_publish"}[kind]
+            if not job or job_id in self.cancelled or job["status"] != expected:
                 continue
             try:
                 if kind == "build":
                     self._build(job)
+                elif kind == "finish":
+                    self._finish(job)
                 else:
                     self._publish(job)
             except Exception as error:  # noqa: BLE001 - a job's failure must not stop the worker
@@ -259,9 +365,21 @@ class Runner:
         with self.store.log_path(job_id).open("a", encoding="utf-8") as f:
             f.write(text.rstrip("\n") + "\n")
 
-    def _run(self, job: dict, stage: str, cmd: list[str]) -> str:
+    def _cached(self, job: dict, stage: str, key: str | None, outputs: list) -> bool:
+        """True when the stage finished before with the same input hash and its outputs still exist."""
+        prev = job["stages"].get(stage) or {}
+        if key is None or prev.get("status") != "done" or prev.get("input_hash") != key:
+            return False
+        if not all(Path(p).exists() for p in outputs):
+            return False
+        job["stages"][stage] = {**prev, "cached": True}
+        self.store.save(job)
+        self._log(job["id"], f"\n=== {stage}: inputs unchanged, reusing the previous result")
+        return True
+
+    def _run(self, job: dict, stage: str, cmd: list[str], key: str | None = None) -> str:
         """Runs one step, streams its output to job.log, returns stdout; raises when it fails."""
-        job["stages"][stage] = {"status": "running", "started": time.time()}
+        job["stages"][stage] = {"status": "running", "started": time.time(), "input_hash": key}
         self.store.save(job)
         self._log(job["id"], f"\n=== {stage}: {' '.join(cmd)}")
         env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
@@ -288,16 +406,12 @@ class Runner:
     def _py(self, script: str, *args: str) -> list[str]:
         return [sys.executable, str(SCRIPTS / script), *args]
 
-    def _build(self, job: dict) -> None:
-        spec = job["spec"]
-        out = LESSONS / spec["name"]
-        out.mkdir(parents=True, exist_ok=True)
+    def _lesson_args(self, spec: dict, out: Path) -> tuple[list[str], list[Path] | None]:
+        """The options every stage of a job gets (the stage flag is added per call). Returns the command and,
+        for a script source, the files whose bytes decide whether a stage can be reused."""
         name = spec["name"]
-        job["status"] = "running"
-        job["outputs"]["folder"] = str(out)
-        self.store.save(job)
-
         cmd = self._py("opencut_ptc.py", "lesson", "--out", str(out), "--name", name, "--title", spec["title"])
+        inputs: list[Path] | None = None
         if spec["source"] == "questions":
             for qid in spec["questions"]:
                 cmd += ["--question", str(qid)]
@@ -318,6 +432,7 @@ class Runner:
             cmd += ["--script", str(script_path)]
             # No scenes file: Claude writes one from the imported cues (opencut_scenes.py).
             cmd += ["--visuals", str(visuals) if visuals.exists() else "auto"]
+            inputs = [script_path, visuals]
             if spec["karaoke"]:
                 cmd.append("--karaoke")
         if spec["level"]:
@@ -326,35 +441,102 @@ class Runner:
             cmd += ["--mascot", spec["mascot"]]
         if spec["burn_subtitles"]:
             cmd.append("--burn-subtitles")
-        cmd.append("--dry-run" if spec["dry_run"] else "--render")
+        return cmd, inputs
 
-        stdout = self._run(job, "build", cmd)
-        report = _last_json(stdout)
-        job["outputs"]["build"] = report
+    def _build(self, job: dict) -> None:
+        """Stages tts -> scenes -> render. A stage whose inputs did not change is reused (_cached). When the
+        engine check taught textts new readings, the voice is made again (up to 2 passes); if lines still
+        fail, the job goes to QUARANTINE instead of publishing review."""
+        spec = job["spec"]
+        out = LESSONS / spec["name"]
+        out.mkdir(parents=True, exist_ok=True)
+        name = spec["name"]
+        job["status"] = "running"
+        job["outputs"]["folder"] = str(out)
+        self.store.save(job)
+
+        base, inputs = self._lesson_args(spec, out)
+        voices = REPO / "scripts" / "lesson_voices.json"
+        state = out / f"{name}.tts.json"
+        project = out / f"{name}.project.json"
+        video = out / f"{name}.mp4"
+        job["outputs"]["video"] = str(video)
+
         if spec["dry_run"]:
-            for s in ("mix", "qc", "publish"):
+            self._run(job, "tts", base + ["--stage", "tts", "--dry-run"])
+            for s in ("scenes", "render", "mix", "qc", "publish"):
                 job["stages"][s]["status"] = "skipped"
             job["status"] = "done"
             self.store.save(job)
             return
-        video = (report or {}).get("video")
-        if not video or not Path(video).exists():
-            raise JobError("build finished without a video; see qc.json in the lesson folder")
-        if (report.get("qc") or {}).get("engine", {}).get("ok") is False:
-            job["outputs"]["warnings"] = ["engine QC still finds suspect lines after the rebuilds; see qc.json"]
 
+        tts_key = _hash_text(name, spec["title"], spec["level"], _hash_files(*inputs, voices)) if inputs else None
+        attempts = 2
+        ran_tts = False
+        engine_ok: bool | None = None
+        for attempt in range(1, attempts + 1):
+            # A second pass is a real voice pass: the cached result of the first one is not valid any more.
+            key = None if (attempt > 1 or ran_tts) else tts_key
+            if not self._cached(job, "tts", key, [state]):
+                self._run(job, "tts", base + ["--stage", "tts"], key=key)
+                ran_tts = True
+            scenes_key = _hash_text(tts_key, spec["mascot"], spec["karaoke"], _hash_files(inputs[1])) if tts_key else None
+            # After a fresh voice pass the scenes are drawn again (cue times may have moved).
+            ran_scenes = ran_tts or not self._cached(job, "scenes", scenes_key, [project])
+            if ran_scenes:
+                report = _last_json(self._run(job, "scenes", base + ["--stage", "scenes"], key=scenes_key)) or {}
+                job["outputs"]["scenes"] = report
+                self.store.save(job)
+            else:
+                report = job["outputs"].get("scenes") or {}
+            engine_ok = ((report.get("qc") or {}).get("engine") or {}).get("ok")
+            if not report.get("retry"):
+                break
+            if attempt < attempts:
+                self._log(job["id"], "\n>>> the engine check taught textts new readings: voicing the lesson again")
+                ran_tts = False  # next pass re-voices
+        if engine_ok is False:
+            job["status"] = "quarantine"
+            job["error"] = ("engine QC still finds lines the reader cannot say right after the rebuilds (see "
+                            "qc.json). Fix the script or readings, then POST /jobs/<id>/retry {\"force\": true}; "
+                            "or POST /jobs/<id>/accept to continue to review")
+            self.store.save(job)
+            self._log(job["id"], f"\n!! quarantine: {job['error']}")
+            return
+
+        render_key = _hash_text(scenes_key, _hash_files(project), spec["burn_subtitles"]) if scenes_key else None
+        if ran_scenes or not self._cached(job, "render", render_key, [video]):
+            stdout = self._run(job, "render", base + ["--stage", "render"], key=render_key)
+            job["outputs"]["render"] = _last_json(stdout)
+        if not video.exists():
+            raise JobError("render finished without a video; see qc.json in the lesson folder")
+        self._finish(job)
+
+    def _finish(self, job: dict) -> None:
+        """Stages mix -> qc -> publish (dry run), then the job waits for a person to approve the upload."""
+        spec = job["spec"]
+        name = spec["name"]
+        out = LESSONS / name
+        job["status"] = "running"
+        self.store.save(job)
+        video = Path(job["outputs"]["video"])
         final = out / f"{name}.final.mp4"
         markers = out / f"{name}.markers.json"
-        mix = self._py("lesson_audio.py", "mix", video, "-o", str(final))
-        if markers.exists():
-            mix += ["--markers", str(markers)]
-        if spec["bgm"]:
-            mix += ["--bgm", spec["bgm"]]
-        self._run(job, "mix", mix)
+
+        mix_key = _hash_text(_hash_files(video, markers), spec["bgm"])
+        if not self._cached(job, "mix", mix_key, [final]):
+            mix = self._py("lesson_audio.py", "mix", str(video), "-o", str(final))
+            if markers.exists():
+                mix += ["--markers", str(markers)]
+            if spec["bgm"]:
+                mix += ["--bgm", spec["bgm"]]
+            self._run(job, "mix", mix, key=mix_key)
         job["outputs"]["final"] = str(final)
 
-        self._run(job, "qc", self._py("lesson_qc.py", "video", str(final)))
-        self._qc_report(job, out, name)
+        qc_key = _hash_files(final)
+        if not self._cached(job, "qc", qc_key, [out / f"{name}.qc-report.json"]):
+            self._run(job, "qc", self._py("lesson_qc.py", "video", str(final)), key=qc_key)
+            self._qc_report(job, out, name)
 
         self._run(job, "publish", self._publish_cmd(job, dry_run=True))
         job["stages"]["publish"]["status"] = "dry_run"
@@ -401,13 +583,32 @@ class Runner:
         for srt in sorted((out / "textts").glob("*.srt")) if (out / "textts").exists() else []:
             cmd += ["--captions", str(srt)]
             break
+        if pub.get("publish_at"):
+            cmd += ["--publish-at", pub["publish_at"]]
         if dry_run:
             cmd.append("--dry-run")
         else:
             cmd += ["--qc-report", str(out / f"{name}.qc-report.json")]
         return cmd
 
+    def _publish_units(self, job: dict) -> int:
+        """Quota the upload needs: the video, the first subtitle file, the thumbnail, the playlist."""
+        spec, out = job["spec"], LESSONS / job["spec"]["name"]
+        name = spec["name"]
+        srt = (sorted((out / "textts").glob("*.srt")) or [None])[0] if (out / "textts").exists() else None
+        return youtube_quota.upload_units(captions=1 if srt else 0,
+                                          thumbnail=(out / f"{name}.thumb.png").exists(),
+                                          playlist=bool(spec["publish"].get("playlist")))
+
     def _publish(self, job: dict) -> None:
+        """Uploads. The daily YouTube quota is booked first; when it does not cover the upload the job waits
+        (waiting_quota) until the quota resets at midnight Pacific time."""
+        if not self.quota.spend(self._publish_units(job), job["id"], "upload"):
+            job["status"] = "waiting_quota"
+            job["outputs"]["quota_retry_after"] = youtube_quota.next_reset().isoformat()
+            self.store.save(job)
+            self._log(job["id"], f"\n>>> YouTube quota is used up today; retry after {job['outputs']['quota_retry_after']}")
+            return
         job["status"] = "publishing"
         self.store.save(job)
         stdout = self._run(job, "publish", self._publish_cmd(job, dry_run=False))
@@ -415,6 +616,24 @@ class Runner:
         job["outputs"]["youtube"] = found.group(0) if found else None
         job["status"] = "done"
         self.store.save(job)
+
+
+def _hash_files(*paths) -> str:
+    """sha256 of the files' bytes (a missing file counts as missing): a stage's input hash."""
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(str(path).encode("utf-8") + b"\0")
+        if path and Path(path).is_file():
+            with Path(path).open("rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    digest.update(chunk)
+        else:
+            digest.update(b"<missing>")
+    return digest.hexdigest()
+
+
+def _hash_text(*parts) -> str:
+    return hashlib.sha256(json.dumps(parts, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 def _last_json(text: str) -> dict | None:
@@ -481,6 +700,10 @@ def make_handler(store: Store, runner: Runner):
                     return self._send(201, runner.submit(validate(body)))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "cancel":
                     return self._send(200, runner.cancel(parts[1]))
+                if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "retry":
+                    return self._send(202, runner.retry(parts[1], force=bool(body.get("force"))))
+                if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "accept":
+                    return self._send(202, runner.accept(parts[1]))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "publish":
                     return self._send(202, runner.approve_publish(parts[1], dict(body)))
                 self._send(404, {"error": "not found"})

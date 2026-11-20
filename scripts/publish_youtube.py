@@ -14,7 +14,7 @@ Default quota is ~6 uploads/day (1600 units each of 10000).
 markers.json: a list (or {"markers": [...]}) of objects with a time in seconds
 (`time`, `at`, `start` or `seconds`; `ms` variants also accepted) and a `label`/`title`/`name`.
 """
-import argparse, base64, hashlib, http.server, json, os, secrets, sys, threading
+import argparse, base64, datetime, hashlib, http.server, json, os, secrets, sys, threading
 import time, urllib.error, urllib.parse, urllib.request, webbrowser
 
 API = "https://www.googleapis.com"
@@ -212,6 +212,7 @@ def main():
     a.add_argument("--tags", default="日本語,JLPT")
     a.add_argument("--dry-run", action="store_true")
     a.add_argument("--qc-report", help="lesson_qc.py report JSON; a real upload needs status PASSED")
+    a.add_argument("--publish-at", help="ISO 8601 time (with offset) to publish at; YouTube keeps the video private until then")
     o = a.parse_args()
 
     desc = open(o.description_file, encoding="utf-8").read() if o.description_file else o.description
@@ -221,9 +222,17 @@ def main():
             desc = (desc + "\n\n" if desc else "") + "\n".join(f"{stamp(t)} {l}" for t, l in ch)
         else:
             print("Markers give fewer than 3 usable chapters; skipping chapter list.")
+    status = {"privacyStatus": o.privacy, "selfDeclaredMadeForKids": False}
+    if o.publish_at:
+        # YouTube publishes a scheduled video itself at publishAt; it must be private until then.
+        when = datetime.datetime.fromisoformat(o.publish_at)
+        if when.tzinfo is None or when <= datetime.datetime.now(datetime.timezone.utc):
+            sys.exit("--publish-at must be a future time with a UTC offset, e.g. 2026-11-25T09:00:00+09:00")
+        status = {"privacyStatus": "private", "publishAt": when.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                  "selfDeclaredMadeForKids": False}
     meta = {"snippet": {"title": o.title[:100], "description": desc, "categoryId": "27",
                         "defaultLanguage": "ja", "tags": [t for t in o.tags.split(",") if t]},
-            "status": {"privacyStatus": o.privacy, "selfDeclaredMadeForKids": False}}
+            "status": status}
     if o.dry_run:
         print(json.dumps(meta, ensure_ascii=False, indent=2))
         return
