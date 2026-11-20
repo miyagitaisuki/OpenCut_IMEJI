@@ -24,7 +24,7 @@ mod settings;
 
 pub use audio::{AudioBuffer, decode_audio};
 pub use decode::{VideoDecoder, thumbnails};
-pub use encode::{AudioSettings, VideoCodec, VideoSettings, VideoWriter};
+pub use encode::{AudioSettings, VideoCodec, VideoSettings, VideoWriter, hardware_h264_available};
 pub use error::{Error, Result};
 pub use frame::{Frame, PixelFormat};
 pub use probe::{AudioStream, MediaInfo, OtherStream, VideoStream, probe};

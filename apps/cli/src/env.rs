@@ -5,8 +5,10 @@
 //! textts and `lesson.ts words` call come from elsewhere, so they are resolved here and
 //! reported, not left to whatever PATH happens to hold.
 
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use serde::Serialize;
 
@@ -85,7 +87,42 @@ pub fn report() -> Report {
         issues.push("no node: `lesson.ts` (intro, lesson build, words) needs Node 22+ on PATH or OPENCUT_NODE".into());
     }
 
+    // The homograph tagger (fugashi + a dictionary) runs in OPENCUT_TAGGER_PYTHON if set, else python on PATH.
+    // An explicitly configured interpreter that fails is an issue; the default one only a warning (the step is optional).
+    let tagger_set = std::env::var_os("OPENCUT_TAGGER_PYTHON").filter(|v| !v.is_empty()).is_some();
+    match resolve("python", "OPENCUT_TAGGER_PYTHON") {
+        None if tagger_set => issues.push("OPENCUT_TAGGER_PYTHON is set but is not a file".into()),
+        None => warnings.push("no python on PATH: homograph suggestions run rules only".into()),
+        Some(py) => {
+            let works = Command::new(&py)
+                .args(["-c", "import fugashi; fugashi.Tagger()('日本語')"])
+                .output()
+                .map(|out| out.status.success())
+                .unwrap_or(false);
+            if !works {
+                let msg = format!(
+                    "fugashi with a dictionary does not run in {}: run `pip install fugashi unidic-lite` there, or homograph suggestions use rules only",
+                    py.display()
+                );
+                if tagger_set { issues.push(msg) } else { warnings.push(msg) }
+            }
+        }
+    }
+
+    // textts is the voice engine: a lesson build cannot start without it.
+    match textts_addr() {
+        Err(url) => issues.push(format!("TEXTTS_URL must be http://host:port, got {url}")),
+        Ok(addr) => {
+            if TcpStream::connect_timeout(&addr, Duration::from_secs(1)).is_err() {
+                issues.push(format!("textts is not reachable at {addr}: start textts or set TEXTTS_URL"));
+            }
+        }
+    }
+
     let h264 = opencut_media::h264_enabled();
+    if h264 && !opencut_media::hardware_h264_available() {
+        warnings.push("the pinned FFmpeg has no h264_mf encoder: H.264 renders use OpenH264, which is slower and differs in quality".into());
+    }
     if h264 {
         // Ask the FFmpeg binary which H.264 encoder it has: a library file name does not show that.
         let has_encoder = ffmpeg.as_ref().map_or(false, |f| {
@@ -131,6 +168,26 @@ fn ffmpeg_libs() -> FfmpegLibs {
     libraries.sort();
     let present = libraries.iter().any(|name| avcodec_major_from_file(name).is_some());
     FfmpegLibs { dir: bin.display().to_string(), present, libraries }
+}
+
+/// `TEXTTS_URL` (default http://127.0.0.1:8000) as a socket address.
+fn textts_addr() -> Result<SocketAddr, String> {
+    let url = std::env::var("TEXTTS_URL")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:8000".into());
+    parse_http_addr(&url)
+}
+
+/// `http://host:port[/...]` as a socket address. Err carries the input when it is not that form.
+fn parse_http_addr(url: &str) -> Result<SocketAddr, String> {
+    let rest = url.trim_end_matches('/').strip_prefix("http://").ok_or_else(|| url.to_string())?;
+    let host_port = rest.split('/').next().unwrap_or_default();
+    host_port
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut addrs| addrs.next())
+        .ok_or_else(|| url.to_string())
 }
 
 /// `OPENCUT_<TOOL>` if set, else the tool on PATH, else (ffmpeg on Windows) the copy textts ships.
@@ -185,4 +242,17 @@ fn libavcodec_major(text: &str) -> Option<String> {
         .find_map(|l| l.trim().strip_prefix("libavcodec "))
         .and_then(|rest| rest.trim().split('.').next())
         .map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn textts_url_must_be_http_host_port() {
+        assert!(parse_http_addr("http://127.0.0.1:8000/").is_ok());
+        assert!(parse_http_addr("http://127.0.0.1:8000/api").is_ok());
+        assert!(parse_http_addr("https://example.com:443").is_err());
+        assert!(parse_http_addr("127.0.0.1:8000").is_err());
+    }
 }
