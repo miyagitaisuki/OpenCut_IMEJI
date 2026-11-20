@@ -8,14 +8,19 @@
 //
 // The project is what `opencut import-textts` wrote: its subtitles are the
 // cues the scenes point at, and its audio tells where the body starts.
+//   bun run lesson whisper-setup                               fetches Whisper (once, ~150 MB)
+//   bun run lesson words   <x.project.json>                    when each token of the voice is said
+// --captions draws the subtitles into the picture, lit word by word.
 // Options: -o <path> (video, or folder for stills). Set REMOTION_BROWSER to
 // a Chrome/Chromium binary to use it instead of Remotion's own.
 
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { align, karaoke, type Heard } from "../src/lesson/karaoke.ts";
 import { planScenes } from "../src/lesson/plan.ts";
 import type { Cue, LessonProps, VisualsFile } from "../src/lesson/types.ts";
 
@@ -55,13 +60,83 @@ export function bodyRange(project: Project): { start: number; end: number } {
   return { start: Math.min(...cues.map((c) => c.start)), end: Math.max(...cues.map((c) => c.end)) };
 }
 
+const wordsFile = (projectPath: string) => resolve(projectPath).replace(/\.project\.json$|\.json$/, "") + ".words.json";
+
+// Whisper (whisper.cpp) lives outside git: `lesson whisper-setup` fetches it.
+const whisperDir = resolve(process.env.WHISPER_DIR || join(root, "..", "..", ".cache", "whisper"));
+const whisperModel = "ggml-base.bin";
+
+async function whisperSetup(): Promise<void> {
+  const { downloadWhisperModel, installWhisperCpp } = await import("@remotion/install-whisper-cpp");
+  mkdirSync(whisperDir, { recursive: true });
+  // The installer drops its zip in the working directory.
+  process.chdir(whisperDir);
+  await installWhisperCpp({ to: whisperDir, version: "1.5.5", printOutput: false });
+  await downloadWhisperModel({ model: "base", folder: whisperDir, printOutput: false });
+  console.log(`whisper ready in ${whisperDir}`);
+}
+
+/**
+ * Listens to the lesson's voice and writes when each token was said, next to the
+ * project, so `--captions` can light the text at the real pace.
+ */
+function words(projectPath: string): string {
+  const exe = join(whisperDir, process.platform === "win32" ? "main.exe" : "main");
+  const model = join(whisperDir, whisperModel);
+  if (!existsSync(exe) || !existsSync(model)) throw new Error(`whisper is not set up (${whisperDir}); run: bun run lesson whisper-setup`);
+  const project = readJson<Project>(projectPath);
+  const { start } = bodyRange(project);
+  const out: Heard[] = [];
+  for (const clip of (project.audio ?? []).filter((a) => a.duration)) {
+    const wav = join(whisperDir, "voice.wav");
+    const dec = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", clip.path, "-ar", "16000", "-ac", "1", wav], { stdio: "inherit" });
+    if (dec.status !== 0) throw new Error(`ffmpeg could not read ${clip.path}`);
+    const base = join(whisperDir, "voice");
+    const run = spawnSync(exe, ["-m", model, "-f", wav, "-l", "ja", "-ojf", "-of", base], { stdio: ["ignore", "ignore", "inherit"] });
+    if (run.status !== 0) throw new Error("whisper failed");
+    // Latin-1 keeps every byte: a token may hold half of a UTF-8 character.
+    const json = JSON.parse(readFileSync(`${base}.json`).toString("latin1"));
+    const shift = (clip.start ?? 0) - start;
+    let held: number[] = [];
+    let from = 0;
+    for (const seg of json.transcription) {
+      for (const t of seg.tokens) {
+        const bytes = [...Buffer.from(t.text, "latin1")];
+        if (bytes[0] === 0x5b && t.text.startsWith("[_")) continue; // [_BEG_], [_TT_..]
+        if (!held.length) from = t.offsets.from;
+        held = held.concat(bytes);
+        let text: string;
+        try {
+          text = new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(held));
+        } catch {
+          continue; // half a character: wait for the rest
+        }
+        out.push({ text, start: from / 1000 + shift, end: t.offsets.to / 1000 + shift });
+        held = [];
+      }
+    }
+    rmSync(wav, { force: true });
+    rmSync(`${base}.json`, { force: true });
+  }
+  const file = wordsFile(projectPath);
+  writeFileSync(file, JSON.stringify(out, null, 1) + "\n", "utf8");
+  return file;
+}
+
 export function buildProps(visualsPath: string, projectPath: string): LessonProps {
   const visuals = readJson<VisualsFile>(visualsPath);
   const project = readJson<Project>(projectPath);
   const cues: Cue[] = project.subtitles ?? [];
   const { start, end } = bodyRange(project);
   const duration = Math.round((end - start) * 1000) / 1000;
-  return { duration, segments: planScenes(cues, visuals.scenes ?? [], start, duration) };
+  const props: LessonProps = { duration, segments: planScenes(cues, visuals.scenes ?? [], start, duration) };
+  // --captions: the subtitles are drawn here, word by word, instead of by the renderer.
+  if (process.argv.includes("--captions")) {
+    const wordsPath = wordsFile(projectPath);
+    const heard = existsSync(wordsPath) ? readJson<Heard[]>(wordsPath) : null;
+    props.captions = cues.map((c) => (heard ? align(c, start, heard) : karaoke(c, start))).filter((k) => k.end > 0 && k.start < duration);
+  }
+  return props;
 }
 
 async function openComposition(props: LessonProps) {
@@ -131,7 +206,11 @@ export function apply(projectPath: string, video: string): void {
 async function main() {
   const [cmd, a, b] = process.argv.slice(2);
   try {
-    if (cmd === "apply" && a && b) {
+    if (cmd === "whisper-setup") {
+      await whisperSetup();
+    } else if (cmd === "words" && a) {
+      console.log(words(resolve(a)));
+    } else if (cmd === "apply" && a && b) {
       apply(resolve(a), b);
       console.log(`${a}: body picture is ${resolve(b)}`);
     } else if (cmd === "preview" && a && b) {
