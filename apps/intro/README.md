@@ -109,6 +109,17 @@ Without `x.words.json`, `--captions` spreads each cue's time over its text (kana
 
 Any authored scene may carry `"accent": "check" | "cross" | "star"` (and `"accent_at": 0.8`, seconds into the scene): a small animated sticker pops once in the top-right corner, for right/wrong answers and praise. They are plain Lottie files in `public/lottie/`, written by `scripts/make_lottie.py` (re-run it to change colours); drop in any other Lottie JSON and add its name to `accent`'s type to use it.
 
+### Writing the scenes with Claude
+
+```powershell
+python scripts/opencut_scenes.py lessons/ch193/ch193.project.json          # Claude API -> ch193.visuals.json (ANTHROPIC_API_KEY)
+python scripts/opencut_scenes.py lessons/ch193/ch193.project.json --prompt-only   # just the prompt, to paste into any Claude
+bun run lesson check   ch193.visuals.json ch193.project.json               # valid? (also runs inside the script)
+bun run lesson preview ch193.visuals.json ch193.project.json               # look at every scene, then edit the JSON
+```
+
+The prompt carries the template schemas, the rules (no invented chart data, furigana, short text) and every cue with its translation. A reply that fails `check` is sent back once with the errors. `opencut_ptc.py lesson --visuals auto` does it in the lesson run. The lesson text goes to the Claude API: do not use it for material you may not send.
+
 ## Avatars
 
 An avatar is a folder in `public/avatars/` with an `avatar.json` and one
