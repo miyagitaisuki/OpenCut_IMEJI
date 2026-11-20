@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ffmpeg_next::{
-    ChannelLayout, Packet, Rational, codec, encoder, format, frame,
+    ChannelLayout, Packet, Rational, codec, encoder, format, frame, threading,
     software::scaling,
     util::format::sample::{Sample, Type as SampleType},
 };
@@ -86,23 +86,11 @@ impl VideoWriter {
             .flags()
             .contains(format::Flags::GLOBAL_HEADER);
 
-        let codec = find_video_codec(video.codec)?;
+        let time_base = Rational::new(1, video.fps as i32);
+        let (codec, video_encoder) = open_video_encoder(video, time_base, global_header)?;
         let codec_name = codec.name().to_owned();
         let mut stream = output.add_stream(codec)?;
         let video_stream = stream.index();
-        let mut context = codec::Context::new_with_codec(codec).encoder().video()?;
-        let time_base = Rational::new(1, video.fps as i32);
-        context.set_width(video.width);
-        context.set_height(video.height);
-        context.set_format(format::Pixel::YUV420P);
-        context.set_time_base(time_base);
-        context.set_frame_rate(Some(Rational::new(video.fps as i32, 1)));
-        context.set_bit_rate(video.bit_rate);
-        context.set_gop(video.fps * 2);
-        if global_header {
-            context.set_flags(codec::Flags::GLOBAL_HEADER);
-        }
-        let video_encoder = context.open_as(codec)?;
         stream.set_parameters(&video_encoder);
         stream.set_time_base(time_base);
 
@@ -222,25 +210,74 @@ impl VideoWriter {
     }
 }
 
-fn find_video_codec(choice: VideoCodec) -> Result<ffmpeg_next::Codec> {
-    let h264 = || encoder::find_by_name("libopenh264").or_else(|| encoder::find(codec::Id::H264));
-    let mpeg4 = || encoder::find(codec::Id::MPEG4);
-    // Cisco's OpenH264 is the H.264 encoder: with the user's switch off,
-    // Auto falls back to MPEG-4 and asking for H.264 outright is an error.
+/// Opens the first candidate encoder that starts. A hardware H.264 encoder
+/// (Media Foundation) comes before OpenH264, so a machine whose GPU refuses
+/// the session still gets software H.264.
+fn open_video_encoder(
+    video: &VideoSettings,
+    time_base: Rational,
+    global_header: bool,
+) -> Result<(ffmpeg_next::Codec, encoder::Video)> {
+    let candidates = find_video_codecs(video.codec)?;
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let mut last_error = None;
+    for codec in candidates {
+        let mut context = codec::Context::new_with_codec(codec).encoder().video()?;
+        context.set_width(video.width);
+        context.set_height(video.height);
+        context.set_format(format::Pixel::YUV420P);
+        context.set_time_base(time_base);
+        context.set_frame_rate(Some(Rational::new(video.fps as i32, 1)));
+        context.set_bit_rate(video.bit_rate);
+        context.set_gop(video.fps * 2);
+        // Software encoders split each frame into slices, one per thread;
+        // encoders without slice threading ignore the count.
+        context.set_threading(threading::Config {
+            kind: threading::Type::Slice,
+            count: threads,
+        });
+        if global_header {
+            context.set_flags(codec::Flags::GLOBAL_HEADER);
+        }
+        match context.open_as(codec) {
+            Ok(opened) => return Ok((codec, opened)),
+            Err(error) => last_error = Some(error),
+        }
+    }
+    Err(last_error
+        .expect("find_video_codecs returns at least one codec")
+        .into())
+}
+
+/// Encoders to try for `choice`, in order.
+fn find_video_codecs(choice: VideoCodec) -> Result<Vec<ffmpeg_next::Codec>> {
+    // Cisco's OpenH264 is the software H.264 encoder: with the user's switch
+    // off, Auto falls back to MPEG-4 and asking for H.264 outright is an error.
     let h264_allowed = crate::h264_enabled();
     if choice == VideoCodec::H264 && !h264_allowed {
         return Err(Error::H264Disabled);
     }
-    match choice {
-        VideoCodec::Auto if h264_allowed => h264().or_else(mpeg4),
-        VideoCodec::Auto => mpeg4(),
+    let hardware = || encoder::find_by_name("h264_mf");
+    let openh264 = || encoder::find_by_name("libopenh264").or_else(|| encoder::find(codec::Id::H264));
+    let mpeg4 = || encoder::find(codec::Id::MPEG4);
+    let h264 = || [hardware(), openh264()].into_iter().flatten().collect::<Vec<_>>();
+    let found: Vec<_> = match choice {
+        VideoCodec::Auto if h264_allowed => {
+            let mut list = h264();
+            list.extend(mpeg4());
+            list
+        }
+        VideoCodec::Auto => mpeg4().into_iter().collect(),
         VideoCodec::H264 => h264(),
-        VideoCodec::Mpeg4 => mpeg4(),
+        VideoCodec::Mpeg4 => mpeg4().into_iter().collect(),
+    };
+    if found.is_empty() {
+        return Err(Error::NoEncoder(match choice {
+            VideoCodec::H264 => "h264 (this FFmpeg build has no H.264 encoder: it needs OpenH264)",
+            _ => "mpeg4",
+        }));
     }
-    .ok_or(Error::NoEncoder(match choice {
-        VideoCodec::H264 => "h264 (this FFmpeg build has no H.264 encoder: it needs OpenH264)",
-        _ => "mpeg4",
-    }))
+    Ok(found)
 }
 
 fn add_audio(
