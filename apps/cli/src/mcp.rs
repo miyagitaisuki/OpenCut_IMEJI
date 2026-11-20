@@ -93,6 +93,29 @@ struct ProjectParams {
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
+struct RenderBatchParams {
+    /// A folder of *.project.json files, or a manifest .json: an array of
+    /// project paths or {"projects": [...]}; an entry is a path or
+    /// {"project", "output"?, "burn_subtitles"?}.
+    source: PathBuf,
+    /// Folder for the videos; default beside each project.
+    output_dir: Option<PathBuf>,
+    /// Projects rendered at once; default 1.
+    jobs: Option<usize>,
+    /// auto, h264 or mpeg4. Default auto.
+    codec: Option<String>,
+    /// Draw the subtitles into the picture. Default false.
+    burn_subtitles: Option<bool>,
+    /// Font files for burned-in subtitles.
+    fonts: Option<Vec<PathBuf>>,
+    /// Skip projects whose video is at least as new as their project.json.
+    skip_existing: Option<bool>,
+    /// Start no new renders after the first failure.
+    fail_fast: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
 struct RenderParams {
     /// Path of the project.json.
     project: PathBuf,
@@ -218,6 +241,31 @@ impl OpenCut {
     }
 
     #[tool(
+        description = "Render many lesson projects in one run: a folder of *.project.json or a manifest listing them. Renders one at a time unless jobs is set. skip_existing leaves out projects whose video is newer than their project.json; a failed project does not stop the others unless fail_fast. Returns counts (rendered, skipped, failed, not_run) and one entry per project with its status, output, duration or error. Takes about as long as the total video length on a laptop."
+    )]
+    async fn render_batch(
+        &self,
+        Parameters(params): Parameters<RenderBatchParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                let items = crate::batch::collect(&params.source).map_err(chain)?;
+                let options = crate::batch::Options {
+                    output_dir: params.output_dir,
+                    codec: params.codec.unwrap_or_else(|| "auto".into()),
+                    burn_subtitles: params.burn_subtitles.unwrap_or(false),
+                    fonts: params.fonts.unwrap_or_default(),
+                    jobs: params.jobs.unwrap_or(1),
+                    skip_existing: params.skip_existing.unwrap_or(false),
+                    fail_fast: params.fail_fast.unwrap_or(false),
+                };
+                Ok::<_, Failure>(crate::batch::run(items, &options))
+            })
+            .await,
+        ))
+    }
+
+    #[tool(
         description = "Render a project.json to a video (MP4 by default); burn_subtitles draws the subtitles with furigana and translation into the picture (for YouTube). Writes .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
     )]
     async fn render_project(
@@ -283,7 +331,7 @@ fn json<T: serde::Serialize>(result: Result<T, Failure>) -> Result<CallToolResul
     ))
 }
 
-/// An error with its causes, `outer: inner: …`.
+/// An error with its causes, `outer: inner: â€¦`.
 fn chain(error: anyhow::Error) -> Failure {
     Failure(format!("{error:#}"))
 }
