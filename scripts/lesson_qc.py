@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import homographs
 import json
 import os
 import re
@@ -61,32 +62,45 @@ def similarity(expected: str, heard: str) -> float:
                difflib.SequenceMatcher(None, norm(reading(expected)), h).ratio())
 
 
-def pron(project_path: Path, words_path: Path | None, fix: bool) -> int:
+def pron_data(project_path: Path, words_path: Path | None, fix: bool) -> dict:
+    """Whisper's transcript of each cue against the cue text. Data only; `pron` prints it."""
     project = json.loads(project_path.read_text(encoding="utf-8"))
     words_path = words_path or project_path.with_name(re.sub(r"\.project\.json$|\.json$", "", project_path.name) + ".words.json")
     if not words_path.exists():
-        print(f"error: {words_path} not found: run `node apps/intro/scripts/lesson.ts words {project_path}`", file=sys.stderr)
-        return 2
+        return {"ok": None, "total": 0, "suspects": [], "readings_added": [],
+                "error": f"{words_path} not found: run `node apps/intro/scripts/lesson.ts words {project_path}`"}
     heard = json.loads(words_path.read_text(encoding="utf-8"))
     audio = (project.get("audio") or [{}])[0]
     offset = float(audio.get("start", 0))  # Whisper times count from the body start
-    suspects: list[tuple[int, float, str, str]] = []
-    for i, cue in enumerate(project.get("subtitles", [])):
+    suspects: list[dict] = []
+    cues = project.get("subtitles", [])
+    for i, cue in enumerate(cues):
         lo, hi = cue["start"] - offset - 0.3, cue["end"] - offset + 0.3
         said = "".join(w["text"] for w in heard if lo <= (w["start"] + w["end"]) / 2 <= hi)
         score = similarity(cue["text"], said)
         if score < THRESHOLD:
-            suspects.append((i, score, cue["text"], said))
-    total = len(project.get("subtitles", []))
-    print(f"{total - len(suspects)}/{total} lines sound as written (threshold {THRESHOLD})")
-    for i, score, text, said in suspects:
-        print(f"  line {i}: {score:.2f}  written: {surface(text)}  |  heard: {said or '(nothing)'}")
+            suspects.append({"line": i, "score": round(score, 2), "written": surface(cue["text"]),
+                             "heard": said or "(nothing)", "display": cue["text"]})
+    added: list[str] = []
     if fix and suspects:
         # A single kanji with okurigana (行{い}きます) is a stem, not a word: an entry for it would be
         # applied inside other words. Only words of two or more kanji are added.
-        done = add_readings([pair for _, _, text, _ in suspects for pair in word_candidates(text)], TEXTTS_URL)
-        print(f"added to textts' reading dictionary: {', '.join(done) or 'nothing'}; voice the lesson again to apply them")
-    return 1 if suspects else 0
+        added = add_readings([pair for s_ in suspects for pair in word_candidates(s_["display"])], TEXTTS_URL)
+    return {"ok": not suspects, "total": len(cues), "suspects": suspects, "readings_added": added, "error": None}
+
+
+def pron(project_path: Path, words_path: Path | None, fix: bool) -> int:
+    data = pron_data(project_path, words_path, fix)
+    if data["error"]:
+        print(f"error: {data['error']}", file=sys.stderr)
+        return 2
+    total = data["total"]
+    print(f"{total - len(data['suspects'])}/{total} lines sound as written (threshold {THRESHOLD})")
+    for s_ in data["suspects"]:
+        print(f"  line {s_['line']}: {s_['score']:.2f}  written: {s_['written']}  |  heard: {s_['heard']}")
+    if fix and data["suspects"]:
+        print(f"added to textts' reading dictionary: {', '.join(data['readings_added']) or 'nothing'}; voice the lesson again to apply them")
+    return 1 if data["suspects"] else 0
 
 
 def kana_norm(text: str) -> str:
@@ -135,15 +149,15 @@ def add_readings(pairs: list[tuple[str, str]], url: str) -> list[str]:
     return done
 
 
-def engine(project_path: Path, voices_path: Path, url: str, fix: bool = False) -> int:
-    """Per line: the moras AivisSpeech will say vs the furigana of the script (textts' readings applied first)."""
+def engine_data(project_path: Path, voices_path: Path, url: str, fix: bool = False) -> dict:
+    """Per line: the moras AivisSpeech will say vs the furigana of the script. Data only; `engine` prints it."""
     import urllib.parse  # noqa: PLC0415
 
     known = textts_readings(TEXTTS_URL)
 
     project = json.loads(project_path.read_text(encoding="utf-8"))
     voices = json.loads(voices_path.read_text(encoding="utf-8")) if voices_path.exists() else {}
-    suspects = []
+    suspects: list[dict] = []
     cues = project.get("subtitles", [])
     for i, cue in enumerate(cues):
         voice = (voices.get(str(cue.get("role", "1"))) or voices.get("1") or {}).get("voice")
@@ -156,35 +170,46 @@ def engine(project_path: Path, voices_path: Path, url: str, fix: bool = False) -
         try:
             query = json.load(urllib.request.urlopen(req, timeout=30))
         except Exception as error:  # noqa: BLE001
-            print(f"error: AivisSpeech at {url}: {error}", file=sys.stderr)
-            return 2
+            return {"ok": None, "total": len(cues), "suspects": [], "readings_added": [],
+                    "error": f"AivisSpeech at {url}: {error}"}
         said = "".join(m["text"] for ap in query["accent_phrases"] for m in ap["moras"])
         want = reading(cue["text"])
         for word in sorted(known, key=len, reverse=True):  # Latin words (QBank) are taught to textts in kana
             want = want.replace(word, known[word])
         score = difflib.SequenceMatcher(None, kana_norm(want), kana_norm(said)).ratio()
         if score < 0.85:
-            suspects.append((i, score, want, said))
-    print(f"{len(cues) - len(suspects)}/{len(cues)} lines are read by the engine as the furigana says")
-    for i, score, want, said in suspects:
-        print(f"  line {i}: {score:.2f}  furigana: {want}  |  engine says: {said}")
+            suspects.append({"line": i, "score": round(score, 2), "furigana": want, "engine_says": said,
+                             "display": cue["text"]})
+    added: list[str] = []
     if fix and suspects:
-        pairs = [pair for i, *_ in suspects for pair in word_candidates(cues[i]["text"])]
+        pairs = [pair for s_ in suspects for pair in word_candidates(s_["display"])]
         added = add_readings(pairs, TEXTTS_URL)
-        print(f"added to textts' reading dictionary: {', '.join(added) or 'nothing'}; run the check again, then voice the lesson again")
-    return 1 if suspects else 0
+    return {"ok": not suspects, "total": len(cues), "suspects": suspects, "readings_added": added, "error": None}
 
 
-def layout(folder: Path, safe: tuple[int, int, int, int]) -> int:
-    """Dark text pixels outside the safe area (left, top, right, bottom) of 1920x1080 stills."""
+def engine(project_path: Path, voices_path: Path, url: str, fix: bool = False) -> int:
+    data = engine_data(project_path, voices_path, url, fix)
+    if data["error"]:
+        print(f"error: {data['error']}", file=sys.stderr)
+        return 2
+    total = data["total"]
+    print(f"{total - len(data['suspects'])}/{total} lines are read by the engine as the furigana says")
+    for s_ in data["suspects"]:
+        print(f"  line {s_['line']}: {s_['score']:.2f}  furigana: {s_['furigana']}  |  engine says: {s_['engine_says']}")
+    if fix and data["suspects"]:
+        print(f"added to textts' reading dictionary: {', '.join(data['readings_added']) or 'nothing'}; run the check again, then voice the lesson again")
+    return 1 if data["suspects"] else 0
+
+
+def layout_data(folder: Path, safe: tuple[int, int, int, int]) -> dict:
+    """Dark text pixels outside the safe area of each still. Data only; `layout` prints it."""
     from PIL import Image  # noqa: PLC0415
 
-    bad = 0
     stills = sorted(folder.glob("[0-9][0-9]-*.png"))  # `lesson.ts preview` names them 01-title-cue0.png ...
     if not stills:
-        print(f"error: no stills in {folder}", file=sys.stderr)
-        return 2
+        return {"ok": None, "total": 0, "scenes": [], "error": f"no stills in {folder}"}
     left, top, right, bottom = safe
+    scenes: list[dict] = []
     for path in stills:
         im = Image.open(path).convert("RGB")
         w, h = im.size
@@ -198,11 +223,21 @@ def layout(folder: Path, safe: tuple[int, int, int, int]) -> int:
                 r, g, b = px[x, y]
                 if r < 90 and g < 100 and b < 150:  # navy / ink text
                     out += 1
-        status = "OVERFLOW" if out > 12 else "ok"
-        bad += status != "ok"
-        print(f"  {path.name}: {status}" + (f" ({out} dark samples outside the safe area)" if out else ""))
-    print(f"{len(stills) - bad}/{len(stills)} scenes inside the safe area")
-    return 1 if bad else 0
+        scenes.append({"file": path.name, "ok": out <= 12, "dark_outside": out})
+    return {"ok": all(sc["ok"] for sc in scenes), "total": len(scenes), "scenes": scenes, "error": None}
+
+
+def layout(folder: Path, safe: tuple[int, int, int, int]) -> int:
+    data = layout_data(folder, safe)
+    if data["error"]:
+        print(f"error: {data['error']}", file=sys.stderr)
+        return 2
+    for sc in data["scenes"]:
+        status = "ok" if sc["ok"] else "OVERFLOW"
+        print(f"  {sc['file']}: {status}" + (f" ({sc['dark_outside']} dark samples outside the safe area)" if sc["dark_outside"] else ""))
+    good = sum(sc["ok"] for sc in data["scenes"])
+    print(f"{good}/{data['total']} scenes inside the safe area")
+    return 0 if data["ok"] else 1
 
 
 def video(path: Path, size: tuple[int, int] = (1920, 1080), max_seconds: float | None = None) -> int:
@@ -236,6 +271,177 @@ def video(path: Path, size: tuple[int, int] = (1920, 1080), max_seconds: float |
     return 0 if all(checks.values()) else 1
 
 
+RETRY_BUDGET = 3  # attempts per issue before the loop gives up on it
+
+
+def state_hash(project_path: Path) -> str:
+    """Fingerprint of what the voice and text say: changes when the agent edits a line, not when a check runs."""
+    import hashlib  # noqa: PLC0415
+
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    body = [(c.get("text", ""), c.get("role", "")) for c in project.get("subtitles", [])]
+    return hashlib.sha256(json.dumps(body, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+
+
+def _issue_key(issue: dict) -> str:
+    return f"{issue['type']}|{issue.get('scene_id', '')}|{issue.get('field', '')}"
+
+
+def _circuit(project_path: Path, issues: list[dict]) -> dict:
+    """Circuit breaker over runs. A run is recorded in `<project>.qc-history.json`.
+    OPEN when the same state already failed before (the agent is oscillating between two edits),
+    or when an issue has used its retry budget. OPEN means: stop, quarantine, and ask a person."""
+    history_path = project_path.with_name(re.sub(r"\.project\.json$|\.json$", "", project_path.name) + ".qc-history.json")
+    history = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {"runs": []}
+    current = state_hash(project_path)
+    keys = [_issue_key(i) for i in issues]
+    previous = history["runs"][-1]["state"] if history["runs"] else None
+    # A -> B -> A: this state failed before and the lesson has changed since. A -> A (no edit) is not a loop.
+    repeats = bool(issues) and current != previous and any(
+        r["state"] == current and r["status"] == "FAILED" for r in history["runs"])
+    spent = [k for k in set(keys) if sum(1 for r in history["runs"] if k in r.get("issue_keys", [])) >= RETRY_BUDGET]
+    reason = None
+    if repeats:
+        reason = "this state of the lesson already failed earlier: the edits are going back and forth"
+    elif spent:
+        reason = f"retry budget used up for: {', '.join(sorted(spent))}"
+    status = "FAILED" if issues else "PASSED"
+    # Only a changed lesson is an attempt: checking the same state again is not a new try.
+    if current != previous:
+        history["runs"].append({"state": current, "status": status, "issue_keys": keys})
+        history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"state_hash": current, "circuit": "OPEN" if reason else "CLOSED", "circuit_reason": reason,
+            "attempts_recorded": len(history["runs"])}
+
+
+def report(project_path: Path, words_path: Path | None, stills: Path | None, voices_path: Path,
+           url: str, safe: tuple[int, int, int, int], fix: bool = False) -> dict:
+    """All checks as one structured result an agent can act on.
+
+    status: PASSED (all checks ran and passed), FAILED (issues to fix), or QUARANTINE (the circuit
+    breaker opened: stop editing, a person must look). A check that could not run is listed under
+    `unchecked`; it is never counted as a pass."""
+    checks: dict[str, dict] = {}
+    checks["pron"] = pron_data(project_path, words_path, False)
+    checks["engine"] = engine_data(project_path, voices_path, url, fix)
+    if stills is not None:
+        checks["layout"] = layout_data(stills, safe)
+    unchecked = [name for name, c in checks.items() if c.get("error") or c.get("ok") is None]
+
+    issues: list[dict] = []
+    n = 0
+
+    def add(issue: dict) -> None:
+        nonlocal n
+        n += 1
+        issues.append({"issue_id": f"err_{n:02d}", **issue})
+
+    for line in checks.get("engine", {}).get("suspects", []):
+        token, expected, got = _first_difference(line["furigana"], line["engine_says"])
+        annotated, resolved, unresolved = homographs.annotate(line["display"])
+        issue = {"scene_id": f"cue_{line['line']:03d}", "type": "PRON_MISMATCH", "field": f"subtitles[{line['line']}].text",
+                 "token": token, "expected_reading": expected, "tts_phonemes": got,
+                 "metrics": {"similarity": line["score"], "threshold": 0.85},
+                 "suggestion": f"write the reading explicitly in the text: {token}{{{expected}}} (the engine reads {got})"
+                 if token else "reword or add furigana for the words of this line"}
+        if resolved:  # a homograph rule settles the reading: give the exact text to write
+            issue["homograph_fix"] = annotated
+            issue["suggestion"] = f"write the readings the rules decide: {annotated}"
+        if unresolved:  # the sentence decides: an agent (or a person) reads it
+            issue["homograph_unresolved"] = [u["word"] for u in unresolved]
+        add(issue)
+    for line in checks.get("pron", {}).get("suspects", []):
+        add({"scene_id": f"cue_{line['line']:03d}", "type": "HEARD_MISMATCH", "field": f"subtitles[{line['line']}].text",
+             "heard": line["heard"], "metrics": {"similarity": line["score"], "threshold": 0.55},
+             "suggestion": "check the kanji readings of this line; a listening pass with the engine check confirms it"})
+    for index, sc in enumerate(checks.get("layout", {}).get("scenes", []), start=1):
+        if not sc["ok"]:
+            add({"scene_id": f"scene_{index:02d}_{sc['file'].split('-', 1)[-1].rsplit('.', 1)[0]}",
+                 "type": "LAYOUT_OVERFLOW", "field": "scene_still",
+                 "metrics": {"dark_samples_outside_safe": sc["dark_outside"], "allowed": 12},
+                 "suggestion": "shorten the text of this scene or split it (the safe area is SAFE in src/lesson/theme.tsx)"})
+
+    circuit = _circuit(project_path, issues)
+    if circuit["circuit"] == "OPEN":
+        status = "QUARANTINE"
+    elif issues or unchecked:
+        status = "FAILED"
+    else:
+        status = "PASSED"
+    return {"status": status, "ok": status == "PASSED", **circuit,
+            "checks": {k: {kk: vv for kk, vv in v.items() if kk != "suspects"} for k, v in checks.items()},
+            "unchecked": unchecked, "issues": issues}
+
+
+def _first_difference(expected: str, said: str) -> tuple[str, str, str]:
+    """The first word-sized span where the furigana and the engine's reading differ: (token, expected, said)."""
+    e, g = kana_norm(expected), kana_norm(said)
+    matcher = difflib.SequenceMatcher(None, e, g)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != "equal":
+            return _kanji_near(expected, i1), e[i1:i2], g[j1:j2]
+    return "", "", ""
+
+
+def _kanji_near(text: str, kana_index: int) -> str:
+    """The kanji run closest to a position in the kana reading (a rough token for the suggestion)."""
+    runs = list(re.finditer(r"[一-鿿々]+", surface(text)))
+    if not runs:
+        return ""
+    return max(runs, key=lambda m: -abs(m.start() - kana_index)).group(0)
+
+
+def report_cli(args) -> int:
+    stills = Path(args.stills) if args.stills else None
+    data = report(Path(args.project), Path(args.words) if args.words else None, stills,
+                  Path(args.voices), args.url.rstrip("/"), tuple(int(n) for n in args.safe.split(",")), args.fix)
+    text = json.dumps(data, ensure_ascii=False, indent=2)
+    print(text)
+    if args.out:
+        Path(args.out).write_text(text + "\n", encoding="utf-8")
+    return 0 if data["ok"] else 1
+
+
+def quarantine(project_path: Path, report_data: dict, stills: Path | None, dest: Path) -> Path:
+    """Parks a lesson that is not ready: the project, the failing stills, and a qc_report.md a person can read
+    in about 30 seconds. Nothing here is published."""
+    import shutil  # noqa: PLC0415
+
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(project_path, dest / project_path.name)
+    lines = [f"# QC report: {project_path.name}", "", f"Status: **{report_data['status']}**", ""]
+    if report_data.get("circuit_reason"):
+        lines += [f"Circuit breaker: {report_data['circuit_reason']}", ""]
+    if report_data.get("unchecked"):
+        lines += [f"Not checked: {', '.join(report_data['unchecked'])}", ""]
+    for issue in report_data.get("issues", []):
+        lines.append(f"- **{issue['issue_id']}** `{issue['type']}` {issue.get('scene_id', '')} ({issue.get('field', '')})")
+        lines.append(f"  - metrics: {json.dumps(issue.get('metrics', {}), ensure_ascii=False)}")
+        lines.append(f"  - suggestion: {issue.get('suggestion', '')}")
+        if issue["type"] == "LAYOUT_OVERFLOW" and stills is not None:
+            still = stills / issue.get("scene_id", "").replace("scene_", "", 1)
+            matches = sorted(stills.glob(f"{issue['scene_id'].split('_')[1]}-*.png"))
+            if matches:
+                shutil.copy2(matches[0], dest / matches[0].name)
+                lines.append(f"  - image: {matches[0].name}")
+    (dest / "qc_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (dest / "qc_report.json").write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return dest
+
+
+def quarantine_cli(args) -> int:
+    stills = Path(args.stills) if args.stills else None
+    project = Path(args.project)
+    data = report(project, Path(args.words) if args.words else None, stills, Path(args.voices),
+                  args.url.rstrip("/"), tuple(int(n) for n in args.safe.split(",")), False)
+    if data["status"] == "PASSED":
+        print("passed: nothing to quarantine")
+        return 0
+    folder = quarantine(project, data, stills, Path(args.dest) / re.sub(r"\.project\.json$|\.json$", "", project.name))
+    print(f"{data['status']}: parked in {folder}")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -251,6 +457,23 @@ def main(argv: list[str] | None = None) -> int:
     la = sub.add_parser("layout")
     la.add_argument("folder")
     la.add_argument("--safe", default="90,40,1830,540", help="left,top,right,bottom in pixels")
+    qp = sub.add_parser("quarantine", help="park a lesson that fails QC: qc_report.md, the project, the failing stills")
+    qp.add_argument("project")
+    qp.add_argument("--words")
+    qp.add_argument("--stills")
+    qp.add_argument("--voices", default=str(Path(__file__).resolve().parent / "lesson_voices.json"))
+    qp.add_argument("--url", default=os.environ.get("AIVIS_URL", "http://127.0.0.1:10101"))
+    qp.add_argument("--safe", default="90,40,1830,540")
+    qp.add_argument("--dest", default="quarantine")
+    rp = sub.add_parser("report", help="every check at once, as JSON: pron, engine, layout (with --stills)")
+    rp.add_argument("project")
+    rp.add_argument("--words")
+    rp.add_argument("--stills", help="folder of scene stills (lesson.ts preview) for the layout check")
+    rp.add_argument("--voices", default=str(Path(__file__).resolve().parent / "lesson_voices.json"))
+    rp.add_argument("--url", default=os.environ.get("AIVIS_URL", "http://127.0.0.1:10101"))
+    rp.add_argument("--safe", default="90,40,1830,540")
+    rp.add_argument("--fix", action="store_true", help="teach textts the readings of engine suspects")
+    rp.add_argument("--out", help="also write the JSON report to this file (the publish gate reads it)")
     v = sub.add_parser("video")
     v.add_argument("file")
     v.add_argument("--short", action="store_true", help="a Short: 1080x1920, under 60 s")
@@ -259,6 +482,10 @@ def main(argv: list[str] | None = None) -> int:
         return pron(Path(args.project), Path(args.words) if args.words else None, args.fix)
     if args.command == "engine":
         return engine(Path(args.project), Path(args.voices), args.url.rstrip("/"), args.fix)
+    if args.command == "quarantine":
+        return quarantine_cli(args)
+    if args.command == "report":
+        return report_cli(args)
     if args.command == "layout":
         return layout(Path(args.folder), tuple(int(n) for n in args.safe.split(",")))  # type: ignore[arg-type]
     if args.short:

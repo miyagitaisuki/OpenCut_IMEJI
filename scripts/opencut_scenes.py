@@ -104,7 +104,100 @@ def generate(project: Path, out: Path, model: str | None = None) -> Path:
     raise AssertionError("unreachable")
 
 
+# ---- Shorts ----------------------------------------------------------------
+
+SHORT_MAX_SECONDS = 55.0  # a YouTube Short is under 60 s; the cut-off leaves room for the outro
+
+
+def _scene_last_cue(scenes: list[dict], index: int, cue_count: int) -> int:
+    """The last cue a scene covers: its `until_cue`, else the cue before the next scene."""
+    scene = scenes[index]
+    if scene.get("until_cue") is not None:
+        return min(int(scene["until_cue"]), cue_count - 1)
+    nxt = scenes[index + 1]["cue"] if index + 1 < len(scenes) else cue_count
+    return min(nxt - 1, cue_count - 1)
+
+
+def pick_short(visuals_path: Path, project_path: Path, max_seconds: float = SHORT_MAX_SECONDS) -> dict:
+    """The grammar point worth a Short: a `grammar` scene, its `examples`, and a `practice` question
+    right after them when there is one. The Short is one unbroken stretch of the lesson's voice, so
+    a practice scene that is not directly after the examples is not used.
+
+    Score: examples (up to 4), pattern parts, and 4 for a practice question. Returns the chosen
+    candidate with its reasons; raises ScenesError when nothing fits under `max_seconds`."""
+    visuals = json.loads(visuals_path.read_text(encoding="utf-8"))
+    project = json.loads(project_path.read_text(encoding="utf-8"))
+    cues = project.get("subtitles", [])
+    scenes = sorted(visuals.get("scenes", []), key=lambda sc: sc["cue"])
+    candidates: list[dict] = []
+    for gi, grammar in enumerate(scenes):
+        if grammar.get("template") != "grammar":
+            continue
+        examples = scenes[gi + 1] if gi + 1 < len(scenes) else None
+        if not examples or examples.get("template") != "examples":
+            continue
+        practice = scenes[gi + 2] if gi + 2 < len(scenes) and scenes[gi + 2].get("template") == "practice" else None
+
+        def span(end_index: int) -> tuple[float, float]:
+            last = _scene_last_cue(scenes, end_index, len(cues))
+            return cues[grammar["cue"]]["start"], cues[last]["end"] + 0.8
+
+        start, end = span(gi + 2 if practice else gi + 1)
+        if practice and end - start >= max_seconds:  # too long with the question: keep the pattern and examples
+            practice = None
+            start, end = span(gi + 1)
+        if end - start >= max_seconds:
+            continue
+        items = len(examples.get("items", []))
+        parts = len(grammar.get("parts", []))
+        score = 2 * min(items, 4) + parts + (4 if practice else 0)
+        reasons = [f"{items} example(s)", f"{parts} pattern part(s)"]
+        if practice:
+            reasons.append(f"practice question at cue {practice['cue']}")
+        candidates.append({"grammar_cue": grammar["cue"], "practice_cue": practice["cue"] if practice else None,
+                           "duration_s": round(end - start, 2), "score": score, "reasons": reasons})
+    if not candidates:
+        raise ScenesError("no grammar scene followed by examples fits under "
+                          f"{max_seconds:.0f} s: write a Short by hand (`lesson.ts short --grammar <cue>`)")
+    # Highest score; on a tie, the earlier one in the lesson.
+    return max(candidates, key=lambda c: (c["score"], -c["grammar_cue"]))
+
+
+def make_short(visuals_path: Path, project_path: Path, out: Path | None = None) -> dict:
+    """Picks the Short and renders it beside the main video: a vertical 1080x1920 clip, under 60 s,
+    with the voice cut from the lesson. Nothing is uploaded."""
+    choice = pick_short(visuals_path, project_path)
+    target = out or project_path.with_name(
+        re.sub(r"\.project\.json$|\.json$", "", project_path.name) + f".short-{choice['grammar_cue']}.mp4")
+    _lesson("short", str(visuals_path.resolve()), str(project_path.resolve()),
+            "--grammar", str(choice["grammar_cue"]), "-o", str(target.resolve()))
+    return {**choice, "path": str(target)}
+
+
+def short_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="opencut_scenes.py short",
+                                     description="Pick a lesson's best grammar point (with its practice question) and render it as a Short.")
+    parser.add_argument("visuals", help="x.visuals.json: the lesson's scenes")
+    parser.add_argument("project", help="x.project.json: the lesson's cues and voice")
+    parser.add_argument("-o", "--out", help="the Short's .mp4 (default: next to the project, x.short-<cue>.mp4)")
+    parser.add_argument("--dry-run", action="store_true", help="only print the choice; render nothing")
+    args = parser.parse_args(argv)
+    try:
+        if args.dry_run:
+            print(json.dumps(pick_short(Path(args.visuals), Path(args.project)), ensure_ascii=False, indent=2))
+            return 0
+        result = make_short(Path(args.visuals), Path(args.project), Path(args.out) if args.out else None)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    except ScenesError as error:
+        print(f"opencut_scenes: {error}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "short":
+        return short_main(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("project", help="x.project.json from `opencut import-textts`")
     parser.add_argument("-o", "--out", help="scenes file (default: next to the project, x.visuals.json)")

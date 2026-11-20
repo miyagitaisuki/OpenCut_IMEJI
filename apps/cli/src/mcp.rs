@@ -73,6 +73,19 @@ struct ThumbnailsParams {
 
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
+struct QcParams {
+    /// Path of the project.json to check.
+    project: PathBuf,
+    /// Whisper's words file (`lesson.ts words` writes it). Without it the pronunciation check is skipped and reported as unchecked.
+    words: Option<PathBuf>,
+    /// Folder of scene stills (`lesson.ts preview`). Without it the layout check is skipped and reported as unchecked.
+    stills: Option<PathBuf>,
+    /// Teach textts the readings of the engine's suspect lines (they apply only after the voice is made again).
+    fix_readings: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
 struct ProjectParams {
     /// Path of the project.json.
     project: PathBuf,
@@ -194,6 +207,17 @@ impl OpenCut {
     }
 
     #[tool(
+        description = "Quality check of a lesson project.json before rendering: the voice against the furigana (AivisSpeech), Whisper's transcript against the text (pronunciation, needs words), and text outside the safe area (layout, needs stills). Returns ok, each check's counts, and an issue list: line numbers, the text, what was heard or read, and the fix to make. Fix the furigana or wording in project.json, run it again, and render only when ok is true. unchecked lists checks that could not run; they are not passes.",
+        annotations(read_only_hint = true)
+    )]
+    async fn qc_project(
+        &self,
+        Parameters(params): Parameters<QcParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(blocking(move || run_qc(params)).await))
+    }
+
+    #[tool(
         description = "Render a project.json to a video (MP4 by default); burn_subtitles draws the subtitles with furigana and translation into the picture (for YouTube). Writes .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
     )]
     async fn render_project(
@@ -221,6 +245,38 @@ impl OpenCut {
 }
 
 /// A result as structured JSON content.
+/// Runs `scripts/lesson_qc.py report`. Exit 1 means issues were found, which is an answer, not a failure:
+/// the JSON on stdout is returned either way.
+fn run_qc(params: QcParams) -> Result<serde_json::Value, Failure> {
+    let repo = std::env::var_os("OPENCUT_REPO")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join(".."));
+    let python = std::env::var("OPENCUT_PYTHON").unwrap_or_else(|_| "python".into());
+    let mut command = std::process::Command::new(&python);
+    command
+        .arg(repo.join("scripts").join("lesson_qc.py"))
+        .arg("report")
+        .arg(&params.project);
+    if let Some(words) = &params.words {
+        command.arg("--words").arg(words);
+    }
+    if let Some(stills) = &params.stills {
+        command.arg("--stills").arg(stills);
+    }
+    if params.fix_readings.unwrap_or(false) {
+        command.arg("--fix");
+    }
+    let output = command
+        .output()
+        .map_err(|error| failure(format!("cannot run {python}: {error} (set OPENCUT_PYTHON)")))?;
+    serde_json::from_slice(&output.stdout).map_err(|_| {
+        failure(format!(
+            "lesson_qc printed no report: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    })
+}
+
 fn json<T: serde::Serialize>(result: Result<T, Failure>) -> Result<CallToolResult, Failure> {
     Ok(CallToolResult::structured(
         serde_json::to_value(result?).map_err(failure)?,

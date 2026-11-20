@@ -177,6 +177,25 @@ def find_or_create_playlist(token, title, privacy):
     return r["id"]
 
 
+def gate_qc(path):
+    """Refuses a real upload unless the lesson's QC report (`lesson_qc.py report --out`) says PASSED.
+    A dry run needs no report: it uploads nothing."""
+    if not path:
+        sys.exit("refusing to upload: no --qc-report. Make one: python scripts/lesson_qc.py report <project.json> --out <file>")
+    try:
+        report = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        sys.exit(f"refusing to upload: cannot read the QC report {path}: {error}")
+    status = report.get("status")
+    if status != "PASSED":
+        issues = report.get("issues", [])
+        lines = [f"  {i.get('issue_id')} {i.get('type')} {i.get('scene_id', '')}" for i in issues[:10]]
+        note = f" (circuit breaker: {report['circuit_reason']})" if report.get("circuit_reason") else ""
+        unchecked = f"; not checked: {', '.join(report.get('unchecked', []))}" if report.get("unchecked") else ""
+        sys.exit(f"refusing to upload: QC status is {status}{note}{unchecked}\n" + "\n".join(lines))
+    print(f"QC passed ({path}); uploading")
+
+
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("video")
@@ -192,6 +211,7 @@ def main():
     a.add_argument("--privacy", default="unlisted", choices=["unlisted", "private", "public"])
     a.add_argument("--tags", default="日本語,JLPT")
     a.add_argument("--dry-run", action="store_true")
+    a.add_argument("--qc-report", help="lesson_qc.py report JSON; a real upload needs status PASSED")
     o = a.parse_args()
 
     desc = open(o.description_file, encoding="utf-8").read() if o.description_file else o.description
@@ -207,6 +227,7 @@ def main():
     if o.dry_run:
         print(json.dumps(meta, ensure_ascii=False, indent=2))
         return
+    gate_qc(o.qc_report)
     token = get_token(o.client)
     vid = upload(token, o.video, meta)["id"]
     print(f"\nUploaded: https://youtu.be/{vid} ({o.privacy})")

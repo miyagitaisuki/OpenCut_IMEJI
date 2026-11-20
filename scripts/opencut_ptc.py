@@ -571,6 +571,17 @@ def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
             cmd.append("--burn-subtitles")
         run(cmd)
 
+    if args.short:
+        # The Short beside the main video: a grammar point with its practice question, vertical, under 60 s.
+        if args.visuals and args.visuals != "auto" and not retry:
+            import opencut_scenes
+            try:
+                qc["short"] = opencut_scenes.make_short(Path(args.visuals), project)
+            except opencut_scenes.ScenesError as error:
+                qc["short"] = {"error": str(error)}
+        else:
+            qc["short"] = {"error": "needs --visuals (scenes) to pick a grammar point"}
+
     qbank = write_qbank_manifest(out, name, questions, audio, qc) if questions else None
     report = {"project": str(project), "video": str(video) if video else None,
               "questions": [q["id"] for q in questions], "markers": markers,
@@ -680,6 +691,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="With --visuals: subtitles lit word by word at the voice's pace (needs `bun run lesson whisper-setup` once); "
                              "replaces --burn-subtitles, so intro/outro lines are not burned in")
     lesson.add_argument("--render", action="store_true", help="Also render the video")
+    lesson.add_argument("--short", action="store_true",
+                        help="Also render a Short (vertical, under 60 s) beside the video: a grammar point and its practice question (needs --visuals)")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")
     lesson.add_argument("--no-qc", action="store_true", help="Skip the listen-back check and the engine check")
