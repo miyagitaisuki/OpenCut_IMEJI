@@ -216,10 +216,46 @@ async function renderDetail() {
     <div>${chip(job.status)} <span class="mut" style="margin-left:8px">${esc(job.id)}</span></div>
     <div class="stages">${stages}</div>
     ${error}${warnings}${qc}${yt}
+    <div id="review"></div>
     <div class="row-actions">${actions}</div>
     <div class="row-actions"><button data-act="log">Xem nhật ký</button></div>
     <pre class="log" id="log" style="display:none"></pre>`;
   document.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act, job)));
+  loadReview(job);
+}
+
+// Lines the listen-back check flagged: play each one, teach textts the right reading.
+async function loadReview(job) {
+  const box = $("review");
+  let data;
+  try { data = await api("GET", `/jobs/${job.id}/review`); } catch (e) { box.innerHTML = ""; return; }
+  if (!data.lines.length && !data.taught.length) { box.innerHTML = ""; return; }
+  const lines = data.lines.map((l) => `
+    <div class="stage" style="margin-bottom:8px">
+      <b>${esc(l.id)} <span class="mut" style="font-weight:400">(độ khớp ${esc(l.score)})</span></b>
+      <div>${esc(l.display)}</div>
+      <div class="mut" style="font-size:12px">textts nghe thành: ${esc(l.heard)}</div>
+      <audio controls preload="none" src="/jobs/${esc(job.id)}/clip/${esc(l.id)}" style="margin-top:6px;width:100%"></audio>
+      <div class="row-actions" style="margin-top:6px">
+        <input placeholder="từ, ví dụ 日本" data-w="${esc(l.id)}" style="width:120px">
+        <input placeholder="cách đọc, ví dụ にほん" data-r="${esc(l.id)}" style="width:150px">
+        <button data-teach="${esc(l.id)}">Nhập cách đọc</button>
+      </div>
+    </div>`).join("");
+  const taught = data.taught.length
+    ? `<div class="mut" style="font-size:12px">Đã nhập: ${data.taught.map((t) => esc(t.word) + "=" + esc(t.reading)).join(", ")}. Bấm "Chạy lại" để tạo lại giọng.</div>`
+    : "";
+  box.innerHTML = `<h2 style="border:0;padding:0;margin:10px 0 6px">Đoạn cần nghe lại</h2>${lines}${taught}`;
+  box.querySelectorAll("[data-teach]").forEach((b) => b.addEventListener("click", async () => {
+    const id = b.dataset.teach;
+    const word = box.querySelector(`[data-w="${id}"]`).value;
+    const reading = box.querySelector(`[data-r="${id}"]`).value;
+    try {
+      await api("POST", `/jobs/${job.id}/readings`, { word, reading });
+      toast("Đã nhập cách đọc");
+      loadJobs();
+    } catch (e) { toast("Lỗi: " + e.message); }
+  }));
 }
 
 async function act(name, job) {
