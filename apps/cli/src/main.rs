@@ -6,6 +6,7 @@
 
 mod batch;
 mod env;
+mod jobs_client;
 mod lesson;
 mod mcp;
 

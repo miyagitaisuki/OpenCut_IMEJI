@@ -266,6 +266,83 @@ impl OpenCut {
     }
 
     #[tool(
+        description = "Submit a lesson to the lesson job server (scripts/lesson_jobs.py serve): from QBank question ids, a QBank chapter, or a script_path under lessons/. The job builds the voice, the scenes and the video, then waits for a person to review it. It never uploads. Returns the job id and status."
+    )]
+    async fn submit_lesson_job(
+        &self,
+        Parameters(params): Parameters<SubmitLessonParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                let mut body = serde_json::Map::new();
+                if let Some(name) = params.name {
+                    body.insert("name".into(), name.into());
+                }
+                if let Some(questions) = params.questions {
+                    body.insert("questions".into(), questions.into());
+                }
+                if let Some(chapter) = params.chapter {
+                    body.insert("chapter".into(), chapter.into());
+                }
+                if let Some(script_path) = params.script_path {
+                    body.insert("script_path".into(), script_path.into());
+                }
+                if let Some(title) = params.title {
+                    body.insert("title".into(), title.into());
+                }
+                if let Some(level) = params.level {
+                    body.insert("level".into(), level.into());
+                }
+                if params.dry_run.unwrap_or(false) {
+                    body.insert("dry_run".into(), true.into());
+                }
+                crate::jobs_client::request("POST", "/jobs", Some(&serde_json::Value::Object(body)))
+                    .map_err(failure)
+            })
+            .await,
+        ))
+    }
+
+    #[tool(
+        description = "Status of one lesson job: status (queued, running, quarantine, awaiting_approval, done, failed, cancelled...), the error if any, each stage's status, and the QC status and warnings. Read-only."
+    )]
+    async fn get_job_status(
+        &self,
+        Parameters(params): Parameters<JobIdParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                let job = crate::jobs_client::request("GET", &format!("/jobs/{}", params.job_id), None)
+                    .map_err(failure)?;
+                Ok::<_, Failure>(job_summary(&job))
+            })
+            .await,
+        ))
+    }
+
+    #[tool(
+        description = "Lesson jobs waiting for a person: status quarantine (the scenes or the engine check still fail after the automatic rebuilds). Each has its error. Read-only; to continue a job the person has reviewed, use the job server's accept route, not this tool."
+    )]
+    async fn list_quarantine(&self) -> Result<CallToolResult, ErrorData> {
+        respond(json(
+            blocking(move || {
+                let jobs = crate::jobs_client::request("GET", "/jobs", None).map_err(failure)?;
+                let items: Vec<serde_json::Value> = jobs
+                    .as_array()
+                    .map(|list| {
+                        list.iter()
+                            .filter(|job| job["status"] == "quarantine")
+                            .map(job_summary)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Ok::<_, Failure>(serde_json::json!({ "count": items.len(), "jobs": items }))
+            })
+            .await,
+        ))
+    }
+
+    #[tool(
         description = "Render a project.json to a video (MP4 by default); burn_subtitles draws the subtitles with furigana and translation into the picture (for YouTube). Writes .vtt/.srt subtitles and .markers.json (scenes, chapters, question markers) beside it. Returns the output path, duration, codec and warnings. Takes about as long as the video on a laptop."
     )]
     async fn render_project(
@@ -431,4 +508,52 @@ fn respond(result: Result<CallToolResult, Failure>) -> Result<CallToolResult, Er
     Ok(result.unwrap_or_else(|Failure(message)| {
         CallToolResult::error(vec![ContentBlock::text(message)])
     }))
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+struct SubmitLessonParams {
+    /// Folder name under lessons/ (letters, digits, . _ -; max 64). Required with script_path only when no name can be derived.
+    name: Option<String>,
+    /// QBank question ids (one or more).
+    questions: Option<Vec<i64>>,
+    /// A QBank chapter id: every listening question in it.
+    chapter: Option<i64>,
+    /// A lesson script on disk under lessons/ or apps/ (the `[1] 日本語 // Tiếng Việt` format).
+    script_path: Option<String>,
+    /// Title shown on the video and the thumbnail.
+    title: Option<String>,
+    /// JLPT level: N5, N4, N3, N2 or N1 (sets the reading speed and the thumbnail badge).
+    level: Option<String>,
+    /// Stop after writing the textts script; no voice, no video.
+    dry_run: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+struct JobIdParams {
+    /// The job id returned by submit_lesson_job.
+    job_id: String,
+}
+
+/// The fields an agent needs from a job (the full record is large: QC histories, stage timings).
+fn job_summary(job: &serde_json::Value) -> serde_json::Value {
+    let stages: serde_json::Map<String, serde_json::Value> = job["stages"]
+        .as_object()
+        .map(|stages| {
+            stages
+                .iter()
+                .map(|(name, info)| (name.clone(), info["status"].clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    serde_json::json!({
+        "id": job["id"],
+        "name": job["spec"]["name"],
+        "status": job["status"],
+        "error": job["error"],
+        "stages": stages,
+        "qc_status": job["outputs"]["qc_status"],
+        "warnings": job["outputs"]["warnings"],
+    })
 }
