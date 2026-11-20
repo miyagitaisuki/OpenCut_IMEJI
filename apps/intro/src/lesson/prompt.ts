@@ -26,7 +26,8 @@ Templates (all take "cue", optional "until_cue", optional "accent"):
   {"template":"compare","cue":3,"title":"...","left":{"title":"...","items":["..."],"tone":"pink"},"right":{"title":"...","items":["..."],"tone":"sky"}}
   {"template":"chart","cue":4,"title":"...","kind":"bar","items":[{"label":"...","value":42}],"unit":"%","highlight":0}   (kind: bar | donut)
   {"template":"dialogue","cue":1,"title":"...","layout":"bubbles","lines":[{"who":"先輩","text":"...","side":"right"}]}
-  {"template":"image","cue":5,"title":"...","images":[{"src":"images/x.png","caption":"..."}]}`;
+  {"template":"image","cue":5,"title":"...","images":[{"src":"images/x.png","caption":"..."}]}
+  {"template":"practice","cue":6,"title":"練習{れんしゅう}","question":"...","options":["...","...","..."],"answer":1,"think":5,"explain":"..."}   (2-4 options; answer is an index)`;
 
 /** `cues` come from the project (`subtitles`). */
 export function buildPrompt(cues: Cue[], title?: string): string {

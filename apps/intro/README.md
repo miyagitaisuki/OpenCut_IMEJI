@@ -85,6 +85,7 @@ furigana: `食{た}べる`. Items inside a scene pop in one after another.
 | `chart` | `title?`, `kind: "bar"\|"donut"`, `items: [{label, value}]`, `unit?`, `highlight?` (index) |
 | `dialogue` | `title?`, `layout?: "bubbles"\|"timeline"`, `lines: [{who?, text, side?}]` |
 | `image` | `title?`, `images: [{src, caption?}]` (1-3), `tone?`, `note?`. `src` is a picture next to the visuals file (PNG/JPG/SVG/WebP) or an absolute path; it is copied to `public/_lesson/` (git-ignored). Made with an image AI (Flux, Midjourney...) or drawn: mind the licence of what you use. |
+| `practice` | `title?`, `question`, `options` (2-4), `answer` (index), `think?` (seconds, default 5), `explain?`. The choices pop in, a ring counts down, then the right choice turns green with a check and `explain` shows. The answer stays at least 1.5 s; a short scene shortens the countdown. |
 
 `tone` is `pink`, `navy`, `mint`, `sun` or `sky`. Examples: `scenes/lesson-sample.visuals.json`
 (every template, with made-up numbers) and `scenes/ptc-vi.visuals.json` (a real listening lesson).

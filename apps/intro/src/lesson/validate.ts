@@ -2,7 +2,7 @@
 
 import { existsSync } from "node:fs";
 
-const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image"];
+const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image", "practice"];
 const TONES = ["pink", "navy", "mint", "sun", "sky"];
 const ACCENTS = ["check", "cross", "star"];
 
@@ -89,6 +89,12 @@ export function validate(data: unknown, cueCount: number, pictureExists: (src: s
           if ((raw.lines as unknown[]).length > 5) warnings.push(`${here}: more than 5 lines is crowded`);
         }
         if (raw.layout !== undefined && raw.layout !== "bubbles" && raw.layout !== "timeline") errors.push(`${here}: layout must be "bubbles" or "timeline"`);
+        break;
+      case "practice":
+        if (!str(raw.question)) errors.push(`${here}: question is required`);
+        if (!list(raw.options, 2) || (raw.options as unknown[]).length > 4 || !(raw.options as unknown[]).every(str)) errors.push(`${here}: options needs 2 to 4 non-empty strings`);
+        else if (!Number.isInteger(raw.answer) || (raw.answer as number) < 0 || (raw.answer as number) >= (raw.options as unknown[]).length) errors.push(`${here}: answer must be an index into options`);
+        if (raw.think !== undefined && (typeof raw.think !== "number" || raw.think < 0 || raw.think > 30)) errors.push(`${here}: think must be 0..30 seconds`);
         break;
       case "image":
         if (!list(raw.images) || (raw.images as unknown[]).length > 3) errors.push(`${here}: images needs 1 to 3 entries`);
