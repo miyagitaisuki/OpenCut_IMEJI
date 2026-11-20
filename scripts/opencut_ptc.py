@@ -38,12 +38,19 @@ import shutil
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lesson_qc  # noqa: E402  same folder: reading dictionary, word candidates, engine check
 
 REPO = Path(__file__).resolve().parent.parent
 QBANK_URL = os.environ.get("QBANK_URL", "http://127.0.0.1:8765").rstrip("/")
 TEXTTS_URL = os.environ.get("TEXTTS_URL", "http://127.0.0.1:8000").rstrip("/")
+AIVIS_URL = os.environ.get("AIVIS_URL", "http://127.0.0.1:10101").rstrip("/")
+# A kanji run that is not followed by furigana: textts has to guess its reading.
+_KANJI_NO_RUBY = re.compile(r"(?<![一-鿿々])[一-鿿々]+(?![一-鿿々{])")
 PAUSE_BETWEEN_QUESTIONS_MS = 1500
 
 # Lines that carry speech: "[1] ...", "[0] ..." (narrator) or "1 ...".
@@ -217,15 +224,11 @@ def apply_chapters(script: Path, project_path: Path) -> int:
 
 
 def lesson_node(*args: str) -> subprocess.CompletedProcess:
-    node = shutil.which("node")
+    env = tool_env()
+    node = env.get("OPENCUT_NODE") or shutil.which("node")
     if not node:
-        raise PtcError("needs Node.js (node 22+ on PATH)")
+        raise PtcError("needs Node.js (node 22+ on PATH, or OPENCUT_NODE)")
     script = REPO / "apps" / "intro" / "scripts" / "lesson.ts"
-    env = dict(os.environ)
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:  # `lesson words` calls ffmpeg: textts ships one
-        for found in Path(os.environ.get("LOCALAPPDATA", "")).glob("Programs/textts-gui/resources/ffmpeg"):
-            env["PATH"] = f"{found}{os.pathsep}{env.get('PATH', '')}"
     return subprocess.run([node, str(script), *args], cwd=script.parent.parent, env=env,
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
 
@@ -253,22 +256,145 @@ def textts_dialogue(title: str, filename: str, script: str, roles: dict | None =
         body["roles"] = roles
     if level:  # N5 reads about 0.85x with longer pauses; N1 is almost natural speed
         body["options"]["level"] = level
-    result = http_json("POST", f"{TEXTTS_URL}/api/v1/dialogue", body)
+    try:
+        result = http_json("POST", f"{TEXTTS_URL}/api/v1/dialogue", body)
+    except PtcError as error:
+        if "HTTP 500" in str(error):
+            ffmpeg_dir = tool_env().get("OPENCUT_FFMPEG_DIR")
+            hint = (f"; restart textts with {ffmpeg_dir} on PATH" if ffmpeg_dir
+                    else "; restart textts with an ffmpeg binary on PATH (see `opencut env`)")
+            raise PtcError(f"textts failed to build audio (HTTP 500): it most likely cannot find ffmpeg{hint}") from error
+        raise
     if not result.get("ok"):
         raise PtcError(f"textts refused the script: {result}")
     return result
 
 
-def textts_outputs(result: dict) -> tuple[Path, Path, Path]:
-    folder, base = Path(result["folder"]), result["filename"]
-    audio, srt, timeline = (folder / f"{base}{s}" for s in (".mp3", ".srt", ".timeline.json"))
-    missing = [str(p) for p in (audio, srt, timeline) if not p.exists()]
-    if missing:
-        raise PtcError(f"textts did not write {', '.join(missing)}")
-    return audio, srt, timeline
+def textts_outputs(result: dict, dest: Path) -> tuple[Path, Path, Path]:
+    """The audio, subtitles and timeline textts made. Uses the file when this machine has it (textts on
+    the host); otherwise downloads it from textts' /files/ URL into `dest`, so the pipeline also runs in a
+    container, where textts' folder path does not exist."""
+    files = result.get("files", {})
+    dest.mkdir(parents=True, exist_ok=True)
+    found: list[Path] = []
+    for key, ext in (("audio", ".mp3"), ("srt", ".srt"), ("timeline_json", ".timeline.json")):
+        local = Path(files[key]) if files.get(key) else Path(result["folder"]) / f"{result['filename']}{ext}"
+        if local.exists():
+            found.append(local)
+            continue
+        url = files.get(f"{key}_url")
+        if not url:
+            raise PtcError(f"textts did not write {local}, and gave no download URL for it")
+        # textts reports http://127.0.0.1:8000/files/...; fetch it from the TEXTTS_URL this run uses instead.
+        target = dest / local.name
+        request_url = TEXTTS_URL + urllib.parse.urlparse(url).path
+        try:
+            with urllib.request.urlopen(request_url, timeout=120) as response:
+                target.write_bytes(response.read())
+        except (urllib.error.URLError, OSError) as error:
+            raise PtcError(f"cannot download {request_url}: {error}") from error
+        found.append(target)
+    return found[0], found[1], found[2]
+
+
+def textts_check_audio(script: str, roles: dict | None, threshold: float) -> dict:
+    """textts listens back to every line and scores it against the script (`results[]` with ok/score/heard)."""
+    body: dict = {"script": script, "engine": "aivis", "threshold": threshold}
+    if roles:
+        body["roles"] = roles
+    return http_json("POST", f"{TEXTTS_URL}/api/v1/check-audio", body, timeout=900)
+
+
+def textts_preview(script: str) -> list[dict]:
+    """textts' own furigana suggestions per line (`items[]` with `display`, `annotated`, `reading`)."""
+    return http_json("POST", f"{TEXTTS_URL}/api/v1/preview-script", {"script": script}, timeout=120).get("items", [])
+
+
+def unannotated_lines(script: str) -> list[str]:
+    """Spoken lines with kanji but no furigana: the voice guesses those readings."""
+    return [l.strip() for l in script.splitlines() if _is_speech(l) and _KANJI_NO_RUBY.search(l)]
+
+
+def voice_with_qc(script: str, roles: dict | None, args: argparse.Namespace, title: str, name: str) -> tuple[dict, dict]:
+    """Voices the script, has textts listen back to each line, and where a line is read wrong teaches
+    textts the kanji words of that line (from the script's furigana) and voices the script again."""
+    if args.no_qc:
+        return textts_dialogue(title, name, script, roles, args.level), {"skipped": True}
+    attempts = max(1, args.max_attempts)
+    history: list[dict] = []
+    taught: set[tuple[str, str]] = set()
+    result: dict = {}
+    for attempt in range(1, attempts + 1):
+        result = textts_dialogue(title, name, script, roles, args.level)
+        qc = textts_check_audio(script, roles, args.qc_threshold)
+        suspects = [r for r in qc.get("results", []) if not r.get("ok")]
+        entry = {"attempt": attempt, "checked": qc.get("checked"),
+                 "suspicious": [{"id": r.get("id"), "display": r.get("display"), "heard": r.get("heard"),
+                                 "score": r.get("score")} for r in suspects]}
+        history.append(entry)
+        if not suspects:
+            return result, {"ok": True, "attempts": attempt, "history": history}
+        pairs = [p for r in suspects for p in lesson_qc.word_candidates(r.get("display") or "")]
+        new_pairs = [p for p in dict.fromkeys(pairs) if p not in taught]
+        if not new_pairs:  # every word was already taught: voicing again would change nothing
+            break
+        taught.update(new_pairs)
+        entry["readings_added"] = lesson_qc.add_readings(new_pairs, TEXTTS_URL)
+        if not entry["readings_added"]:
+            break
+    return result, {"ok": False, "attempts": len(history), "history": history}
+
+
+def run_engine_qc(project: Path, voices: Path) -> dict:
+    """AivisSpeech's own reading of every line vs the furigana (lesson_qc engine). Teaches the readings
+    it finds; `retry` is True only when the reading dictionary actually changed (a voice again can help)."""
+    before = lesson_qc.textts_readings(TEXTTS_URL)
+    code = lesson_qc.engine(project, voices, AIVIS_URL, fix=True)
+    if code == 2:
+        return {"ok": None, "note": "AivisSpeech did not answer; engine check skipped", "retry": False}
+    after = lesson_qc.textts_readings(TEXTTS_URL)
+    return {"ok": code == 0, "retry": after != before, "readings_added": sorted(set(after) - set(before))}
 
 
 # ---- OpenCut -------------------------------------------------------------
+
+
+_ENV_CACHE: dict | None = None
+
+
+def opencut_env() -> dict:
+    """`opencut env --json`: the FFmpeg binaries, Node and what is missing. Printed even when it exits 1."""
+    cmd = [find_opencut(), "env"]
+    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        return json.loads(done.stdout)
+    except json.JSONDecodeError as error:
+        raise PtcError(f"`opencut env` printed no report: {done.stderr.strip() or error}") from error
+
+
+def tool_env() -> dict:
+    """The process environment with the resolved ffmpeg/ffprobe/node folders first on PATH, so every
+    child (lesson.ts, `lesson words`, opencut) uses the same binaries the report names. Cached."""
+    global _ENV_CACHE
+    if _ENV_CACHE is not None:
+        return _ENV_CACHE
+    env = dict(os.environ)
+    try:
+        report = opencut_env()
+    except PtcError:
+        _ENV_CACHE = env  # no opencut yet: fall back to the plain environment (check() reports it)
+        return env
+    folders: list[str] = []
+    for key in ("ffmpeg", "ffprobe", "node"):
+        tool = report.get(key)
+        if tool and tool.get("path"):
+            folders.append(str(Path(tool["path"]).parent))
+            env[f"OPENCUT_{key.upper()}"] = tool["path"]  # what the Python and TS helpers read
+            if key == "ffmpeg":
+                env["OPENCUT_FFMPEG_DIR"] = str(Path(tool["path"]).parent)
+    env["PATH"] = os.pathsep.join(dict.fromkeys(folders + [env.get("PATH", "")]))
+    _ENV_CACHE = env
+    return env
 
 
 def find_opencut() -> str:
@@ -287,7 +413,7 @@ def find_opencut() -> str:
 
 
 def run(cmd: list[str]) -> None:
-    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=tool_env())
     if done.returncode != 0:
         raise PtcError(f"{' '.join(cmd[:3])} failed:\n{done.stderr.strip() or done.stdout.strip()}")
 
@@ -329,6 +455,19 @@ def add_question_markers(project_path: Path, questions: list[dict], starts: list
 
 
 def make_lesson(args: argparse.Namespace) -> dict:
+    """Builds the lesson; when the engine check finds a line it can fix (a reading now taught), builds it
+    again, up to --max-attempts times, so the teacher only sees what the pipeline could not repair."""
+    attempts = max(1, args.max_attempts)
+    for n in range(1, attempts + 1):
+        out = _build_once(args, last=(n == attempts))
+        if not out.pop("_retry", False):
+            out["qc"]["build_attempts"] = n
+            return out
+        print(f"attempt {n}: the engine check taught textts new readings; building the lesson again", file=sys.stderr)
+    raise AssertionError("unreachable")
+
+
+def _build_once(args: argparse.Namespace, last: bool = True) -> dict:
     chapters: list[tuple[str, int]] = []
     from_script = Path(args.script).resolve() if args.script else None
     if from_script:
@@ -368,14 +507,17 @@ def make_lesson(args: argparse.Namespace) -> dict:
     translated_path.write_text(script_tr, encoding="utf-8")
     if args.dry_run:
         return {"dry_run": True, "questions": [q["id"] for q in questions], "chapters": [c[0] for c in chapters],
-                "warnings": warnings, "script": str(out / f"{name}.script.txt")}
+                "warnings": warnings, "script": str(out / f"{name}.script.txt"),
+                "unannotated_lines": unannotated_lines(script)[:20], "qc": {}}
 
     roles = None
     voices = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
     if from_script and voices.exists():
         roles = json.loads(voices.read_text(encoding="utf-8"))
-    result = textts_dialogue(args.title or name, name, script, roles, args.level)
-    audio, srt, timeline = textts_outputs(result)
+    qc: dict = {"unannotated_lines": unannotated_lines(script)[:20]}
+    result, voice_qc = voice_with_qc(script, roles, args, args.title or name, name)
+    qc["voice"] = voice_qc
+    audio, srt, timeline = textts_outputs(result, out / "textts")
     opencut = find_opencut()
     project = out / f"{name}.project.json"
     cmd = [opencut, "import-textts", str(audio), "--srt", str(srt), "--timeline", str(timeline),
@@ -398,6 +540,7 @@ def make_lesson(args: argparse.Namespace) -> dict:
                 visuals = str(opencut_scenes.generate(project, out / f"{name}.visuals.json"))
             except opencut_scenes.ScenesError as error:
                 raise PtcError(f"auto scenes failed: {error}") from error
+            args.visuals = visuals  # a rebuild after an engine fix reuses these scenes, not new ones
         apply_visuals(project, visuals, karaoke=args.karaoke)
 
     if args.mascot:
@@ -409,17 +552,56 @@ def make_lesson(args: argparse.Namespace) -> dict:
     if chapters:
         markers += add_chapter_markers(project, chapters)
 
+    # Engine check: AivisSpeech's own reading of each line against the furigana. Done before rendering,
+    # so a line it can fix is fixed by a rebuild instead of being rendered wrong.
+    retry = False
+    if not args.no_qc:
+        voices_file = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
+        engine_qc = run_engine_qc(project, voices_file)
+        qc["engine"] = engine_qc
+        # On the last attempt there is no rebuild left: render what there is and let qc.json say what failed.
+        retry = bool(engine_qc.get("retry")) and not last
+
     video = None
-    if args.render:
+    if args.render and not retry:
         video = out / f"{name}.mp4"
         cmd = [opencut, "render", str(project), "-o", str(video)]
         # --karaoke draws the subtitles itself; burning them in again would double them.
         if args.burn_subtitles and not (args.visuals and args.karaoke):
             cmd.append("--burn-subtitles")
         run(cmd)
-    return {"project": str(project), "video": str(video) if video else None,
-            "questions": [q["id"] for q in questions], "markers": markers,
-            "duration_s": result.get("duration_s")}
+
+    qbank = write_qbank_manifest(out, name, questions, audio, qc) if questions else None
+    report = {"project": str(project), "video": str(video) if video else None,
+              "questions": [q["id"] for q in questions], "markers": markers,
+              "duration_s": result.get("duration_s"), "qc": qc, "qbank": str(qbank) if qbank else None}
+    (out / f"{name}.qc.json").write_text(json.dumps(qc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    report["_retry"] = retry
+    return report
+
+
+def write_qbank_manifest(out: Path, name: str, questions: list[dict], audio: Path, qc: dict) -> Path:
+    """What to write back to QBank, for the QBank MCP tools (attach_audio, set_status): the audio of a
+    single-question lesson, and the QC verdict. Status is never set here: the teacher approves in QBank."""
+    voice_ok = bool(qc.get("voice", {}).get("ok", qc.get("voice", {}).get("skipped")))
+    engine_ok = qc.get("engine", {}).get("ok") is not False
+    path = out / f"{name}.qbank.json"
+    manifest = {
+        "lesson": name,
+        "qc_passed": voice_ok and engine_ok,
+        "questions": [{"id": q["id"], "code": q.get("code"), "status": q.get("status"),
+                       "chapter_id": q.get("chapter_id")} for q in questions],
+        "audio": str(audio),
+        "actions": [],
+    }
+    if len(questions) == 1 and manifest["qc_passed"]:
+        manifest["actions"].append({"tool": "attach_audio", "question_id": questions[0]["id"], "file_path": str(audio)})
+    elif len(questions) == 1:
+        manifest["actions"].append({"tool": "none", "reason": "QC did not pass; review qc.json before attaching"})
+    else:
+        manifest["actions"].append({"tool": "none", "reason": "several questions share one lesson audio; attach it to a passage or the chapter by hand"})
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def check() -> int:
@@ -432,17 +614,44 @@ def check() -> int:
             ok = False
             print(f"{label}: DOWN - {error}")
     try:
-        print(f"opencut: {find_opencut()}")
+        report = opencut_env()
+        print(f"opencut: {report['opencut']['path']}")
+        for key in ("ffmpeg", "ffprobe", "node"):
+            tool = report.get(key)
+            print(f"  {key}: {tool['path'] + ' (' + (tool.get('version') or '?') + ')' if tool else 'MISSING'}")
+        for item in report.get("issues", []):
+            ok = False
+            print(f"  ISSUE: {item}")
+        for item in report.get("warnings", []):
+            print(f"  warning: {item}")
     except PtcError as error:
         ok = False
         print(f"opencut: {error}")
     return 0 if ok else 1
 
 
+def qc_script(script_path: Path, args: argparse.Namespace) -> dict:
+    """Script QC without building anything: textts' furigana suggestions, lines missing furigana, and
+    the listen-back check (voices the script once, scores each line)."""
+    script, _, _ = parse_lesson_script(script_path)
+    roles = None
+    voices = Path(args.voices) if args.voices else REPO / "scripts" / "lesson_voices.json"
+    if voices.exists():
+        roles = json.loads(voices.read_text(encoding="utf-8"))
+    qc = textts_check_audio(script, roles, args.qc_threshold)
+    suspicious = [r for r in qc.get("results", []) if not r.get("ok")]
+    return {"script": str(script_path), "unannotated_lines": unannotated_lines(script)[:20],
+            "suspicious": suspicious, "checked": qc.get("checked"), "ok": not suspicious}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="Check that QBank, textts and opencut are reachable")
+    qc_cmd = sub.add_parser("qc", help="QC a lesson script with textts (listen-back check) without building the lesson")
+    qc_cmd.add_argument("--script", required=True)
+    qc_cmd.add_argument("--voices", metavar="JSON")
+    qc_cmd.add_argument("--qc-threshold", type=float, default=0.9)
     chap = sub.add_parser("chapters", help="Put a script's ## chapters into an already voiced project")
     chap.add_argument("--script", required=True)
     chap.add_argument("--project", required=True)
@@ -473,10 +682,18 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--render", action="store_true", help="Also render the video")
     lesson.add_argument("--burn-subtitles", action="store_true")
     lesson.add_argument("--dry-run", action="store_true", help="Only write the textts script")
+    lesson.add_argument("--no-qc", action="store_true", help="Skip the listen-back check and the engine check")
+    lesson.add_argument("--qc-threshold", type=float, default=0.9, help="Listen-back score below which a line is wrong (0.5-1)")
+    lesson.add_argument("--max-attempts", type=int, default=2,
+                        help="Voice and build again when QC taught textts new readings (default 2)")
     args = parser.parse_args(argv)
     try:
         if args.command == "check":
             return check()
+        if args.command == "qc":
+            report = qc_script(Path(args.script), args)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 0 if report["ok"] else 1
         if args.command == "chapters":
             print(f"{apply_chapters(Path(args.script), Path(args.project))} chapters")
             return 0

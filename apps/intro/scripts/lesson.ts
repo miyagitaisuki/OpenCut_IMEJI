@@ -100,7 +100,7 @@ function words(projectPath: string): string {
   const out: Heard[] = [];
   for (const clip of (project.audio ?? []).filter((a) => a.duration)) {
     const wav = join(whisperDir, "voice.wav");
-    const dec = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", clip.path, "-ar", "16000", "-ac", "1", wav], { stdio: "inherit" });
+    const dec = spawnSync(process.env.OPENCUT_FFMPEG || "ffmpeg", ["-y", "-loglevel", "error", "-i", clip.path, "-ar", "16000", "-ac", "1", wav], { stdio: "inherit" });
     if (dec.status !== 0) throw new Error(`ffmpeg could not read ${clip.path}`);
     const base = join(whisperDir, "voice");
     const run = spawnSync(exe, ["-m", model, "-f", wav, "-l", "ja", "-ojf", "-of", base], { stdio: ["ignore", "ignore", "inherit"] });
@@ -275,7 +275,7 @@ async function shortVideo(visualsPath: string, projectPath: string): Promise<str
   if (!audio) throw new Error("the project has no voice to cut");
   const shift = from - (audio.start ?? 0);
   const mux = spawnSync(
-    "ffmpeg",
+    process.env.OPENCUT_FFMPEG || "ffmpeg",
     ["-y", "-loglevel", "error", "-i", silent, "-ss", String(Math.max(0, shift)), "-t", String(to - from), "-i", audio.path, "-af", "loudnorm=I=-16:TP=-1.0:LRA=11", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", out],
     { stdio: "inherit" },
   );
