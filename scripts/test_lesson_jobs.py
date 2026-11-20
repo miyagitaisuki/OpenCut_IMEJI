@@ -145,6 +145,9 @@ class StagedBuild(unittest.TestCase):
         def _log(self, job_id, text):
             pass
 
+        def _thumbnail(self, job, out, name):
+            pass
+
         def _qc_report(self, job, out, name):
             (out / f"{name}.qc-report.json").write_text("{}", encoding="utf-8")
 

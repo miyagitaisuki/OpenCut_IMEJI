@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SceneSpec: the lesson visuals file (<lesson>.visuals.json)",
+  "description": "Mirrors apps/intro/src/lesson/types.ts (VisualsFile). Cue ranges and picture files are checked by `lesson check`, not here.",
+  "type": "object",
+  "required": ["scenes"],
+  "additionalProperties": false,
+  "properties": {
+    "scenes": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/scene"}}
+  },
+  "definitions": {
+    "tone": {"enum": ["pink", "navy", "mint", "sun", "sky"]},
+    "timing": {
+      "type": "object",
+      "required": ["cue"],
+      "properties": {
+        "cue": {"type": "integer", "minimum": 0},
+        "until_cue": {"type": "integer", "minimum": 0},
+        "accent": {"enum": ["check", "cross", "star"]},
+        "accent_at": {"type": "number", "minimum": 0}
+      }
+    },
+    "scene": {
+      "allOf": [
+        {"$ref": "#/definitions/timing"},
+        {"oneOf": [
+          {"$ref": "#/definitions/title"},
+          {"$ref": "#/definitions/grammar"},
+          {"$ref": "#/definitions/compare"},
+          {"$ref": "#/definitions/chart"},
+          {"$ref": "#/definitions/dialogue"},
+          {"$ref": "#/definitions/image"},
+          {"$ref": "#/definitions/practice"},
+          {"$ref": "#/definitions/examples"}
+        ]}
+      ]
+    },
+    "title": {
+      "type": "object",
+      "required": ["template", "title"],
+      "properties": {
+        "template": {"const": "title"},
+        "title": {"type": "string", "minLength": 1},
+        "subtitle": {"type": "string"},
+        "badge": {"type": "string"}
+      }
+    },
+    "grammar": {
+      "type": "object",
+      "required": ["template", "parts"],
+      "properties": {
+        "template": {"const": "grammar"},
+        "title": {"type": "string"},
+        "parts": {"type": "array", "minItems": 2, "items": {
+          "type": "object", "required": ["text"],
+          "properties": {"text": {"type": "string", "minLength": 1}, "label": {"type": "string"}, "tone": {"$ref": "#/definitions/tone"}}
+        }},
+        "join": {"enum": ["+", "→"]},
+        "result": {"type": "object", "required": ["text"], "properties": {"text": {"type": "string"}, "label": {"type": "string"}}},
+        "note": {"type": "string"},
+        "tone": {"$ref": "#/definitions/tone"}
+      }
+    },
+    "compare": {
+      "type": "object",
+      "required": ["template", "left", "right"],
+      "properties": {
+        "template": {"const": "compare"},
+        "title": {"type": "string"},
+        "left": {"$ref": "#/definitions/column"},
+        "right": {"$ref": "#/definitions/column"}
+      }
+    },
+    "column": {
+      "type": "object",
+      "required": ["title", "items"],
+      "properties": {
+        "title": {"type": "string"},
+        "items": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "tone": {"$ref": "#/definitions/tone"}
+      }
+    },
+    "chart": {
+      "type": "object",
+      "required": ["template", "kind", "items"],
+      "properties": {
+        "template": {"const": "chart"},
+        "title": {"type": "string"},
+        "kind": {"enum": ["bar", "donut"]},
+        "items": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "required": ["label", "value"],
+          "properties": {"label": {"type": "string"}, "value": {"type": "number"}}
+        }},
+        "unit": {"type": "string"},
+        "highlight": {"type": "integer", "minimum": 0}
+      }
+    },
+    "dialogue": {
+      "type": "object",
+      "required": ["template", "lines"],
+      "properties": {
+        "template": {"const": "dialogue"},
+        "title": {"type": "string"},
+        "layout": {"enum": ["bubbles", "timeline"]},
+        "lines": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "required": ["text"],
+          "properties": {"who": {"type": "string"}, "text": {"type": "string", "minLength": 1}, "side": {"enum": ["left", "right"]}}
+        }}
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": ["template", "images"],
+      "properties": {
+        "template": {"const": "image"},
+        "title": {"type": "string"},
+        "images": {"type": "array", "minItems": 1, "maxItems": 3, "items": {
+          "type": "object", "required": ["src"],
+          "properties": {"src": {"type": "string", "minLength": 1}, "caption": {"type": "string"}}
+        }},
+        "tone": {"$ref": "#/definitions/tone"},
+        "note": {"type": "string"}
+      }
+    },
+    "practice": {
+      "type": "object",
+      "required": ["template", "question", "options", "answer"],
+      "properties": {
+        "template": {"const": "practice"},
+        "title": {"type": "string"},
+        "question": {"type": "string", "minLength": 1},
+        "options": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string"}},
+        "answer": {"type": "integer", "minimum": 0},
+        "think": {"type": "number", "minimum": 0},
+        "explain": {"type": "string"}
+      }
+    },
+    "examples": {
+      "type": "object",
+      "required": ["template", "items"],
+      "properties": {
+        "template": {"const": "examples"},
+        "title": {"type": "string"},
+        "items": {"type": "array", "minItems": 1, "maxItems": 4, "items": {
+          "type": "object", "required": ["text"],
+          "properties": {"text": {"type": "string", "minLength": 1}, "translation": {"type": "string"}, "picture": {"type": "string"}, "cue": {"type": "integer", "minimum": 0}}
+        }},
+        "note": {"type": "string"}
+      }
+    }
+  }
+}

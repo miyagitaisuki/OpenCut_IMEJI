@@ -64,6 +64,10 @@ class PtcError(RuntimeError):
     pass
 
 
+class QuarantineError(PtcError):
+    """The lesson needs a person (scenes still invalid): the job runner quarantines it (exit code 3)."""
+
+
 def http_json(method: str, url: str, body: dict | None = None, timeout: int = 600):
     data = json.dumps(body).encode("utf-8") if body is not None else None
     request = urllib.request.Request(
@@ -597,6 +601,8 @@ def stage_scenes(args: argparse.Namespace, out: Path, name: str, state: dict) ->
                 import opencut_scenes
                 try:
                     visuals = str(opencut_scenes.generate(project, sibling))
+                except opencut_scenes.SceneQuarantine as error:
+                    raise QuarantineError(f"auto scenes need review: {error}") from error
                 except opencut_scenes.ScenesError as error:
                     raise PtcError(f"auto scenes failed: {error}") from error
                 state["visuals_cues"] = cues_now
@@ -822,6 +828,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(json.dumps(make_lesson(args), ensure_ascii=False, indent=2))
         return 0
+    except QuarantineError as error:
+        print(f"quarantine: {error}", file=sys.stderr)
+        return 3
     except PtcError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

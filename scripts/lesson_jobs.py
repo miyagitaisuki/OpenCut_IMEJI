@@ -484,7 +484,16 @@ class Runner:
             # After a fresh voice pass the scenes are drawn again (cue times may have moved).
             ran_scenes = ran_tts or not self._cached(job, "scenes", scenes_key, [project])
             if ran_scenes:
-                report = _last_json(self._run(job, "scenes", base + ["--stage", "scenes"], key=scenes_key)) or {}
+                try:
+                    report = _last_json(self._run(job, "scenes", base + ["--stage", "scenes"], key=scenes_key)) or {}
+                except JobError as error:
+                    if job["stages"]["scenes"].get("exit_code") != 3:  # 3: the scenes need a person
+                        raise
+                    job["status"] = "quarantine"
+                    job["error"] = f"the scenes need review: {error}"
+                    self.store.save(job)
+                    self._log(job["id"], f"\n!! quarantine: {job['error']}")
+                    return
                 job["outputs"]["scenes"] = report
                 self.store.save(job)
             else:
@@ -538,11 +547,29 @@ class Runner:
             self._run(job, "qc", self._py("lesson_qc.py", "video", str(final)), key=qc_key)
             self._qc_report(job, out, name)
 
+        self._thumbnail(job, out, name)
         self._run(job, "publish", self._publish_cmd(job, dry_run=True))
         job["stages"]["publish"]["status"] = "dry_run"
         job["status"] = "awaiting_approval"
         self.store.save(job)
         self._log(job["id"], f"\n>>> watch {final}, then POST /jobs/{job['id']}/publish to upload")
+
+    def _thumbnail(self, job: dict, out: Path, name: str) -> None:
+        """The 1280x720 thumbnail (Remotion renderStill, `lesson.ts thumbnail`) for the upload. A failure only
+        leaves the video without a thumbnail: it is recorded as a warning, the job goes on."""
+        spec = job["spec"]
+        meta = out / f"{name}.thumb.json"
+        png = out / f"{name}.thumb.png"
+        meta.write_text(json.dumps({"title": spec["title"], "subtitle": "", "badge": spec.get("level") or "",
+                                    "tag": "", "pose": "avatars/chibi/pose_a01.png"}, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8")
+        node = os.environ.get("OPENCUT_NODE", "node")
+        done = subprocess.run([node, "scripts/lesson.ts", "thumbnail", str(meta), "-o", str(png)],
+                              cwd=REPO / "apps" / "intro", stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, encoding="utf-8", errors="replace")
+        self._log(job["id"], f"\n=== thumbnail\n{done.stdout[-1500:]}")
+        if done.returncode != 0 or not png.exists():
+            job["outputs"].setdefault("warnings", []).append("thumbnail not rendered; publish without it")
 
     def _qc_report(self, job: dict, out: Path, name: str) -> None:
         """The full QC (voice, pronunciation, layout) as a report file. It does not fail the job: the

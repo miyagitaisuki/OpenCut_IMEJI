@@ -1,0 +1,14 @@
+[
+  {"sentence": "市場に野菜を買いに行きます。", "word": "市場", "reading": "いちば"},
+  {"sentence": "株式市場が上がりました。", "word": "市場", "reading": "しじょう"},
+  {"sentence": "十分に寝ました。", "word": "十分", "reading": "じゅうぶん"},
+  {"sentence": "人気の店です。", "word": "人気", "reading": "にんき"},
+  {"sentence": "一日に三回、薬を飲みます。", "word": "一日", "reading": "いちにち"},
+  {"sentence": "四月一日は休みです。", "word": "一日", "reading": "ついたち"},
+  {"sentence": "辛い料理が好きです。", "word": "辛い", "reading": "からい"},
+  {"sentence": "失恋して辛いです。", "word": "辛い", "reading": "つらい"},
+  {"sentence": "来年日本へ行きます。", "word": "行", "reading": "いき|い"},
+  {"sentence": "何で来ましたか。", "word": "何", "reading": "なん"},
+  {"sentence": "今日は晴れです。", "word": "今日", "reading": "きょう"},
+  {"sentence": "明日行きます。", "word": "明日", "reading": "あした|あす"}
+]
