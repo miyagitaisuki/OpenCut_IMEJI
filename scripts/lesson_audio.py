@@ -19,6 +19,7 @@ the result to -16 LUFS. The picture is copied, not re-encoded.
 """
 from __future__ import annotations
 
+import os
 import argparse
 import json
 import shutil
@@ -39,7 +40,7 @@ class AudioError(RuntimeError):
 
 
 def ffmpeg() -> str:
-    path = shutil.which("ffmpeg")
+    path = os.environ.get("OPENCUT_FFMPEG") or shutil.which("ffmpeg")
     if not path:
         raise AudioError("ffmpeg not found on PATH")
     return path

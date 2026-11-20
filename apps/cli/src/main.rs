@@ -4,6 +4,7 @@
 //! (`probe`, `frame`, `thumbnails`) and for AI agents (`mcp`, a Model
 //! Context Protocol server on stdio).
 
+mod env;
 mod lesson;
 mod mcp;
 
@@ -136,6 +137,8 @@ enum Command {
         /// on or off; omit to show the current setting.
         state: Option<Switch>,
     },
+    /// Show the FFmpeg binaries and tools the pipeline uses, and what is missing (exit 1 on issues).
+    Env,
     /// Serve the editor's tools to AI agents over MCP (stdio).
     Mcp,
 }
@@ -252,6 +255,13 @@ fn main() -> Result<()> {
             }
             let on = opencut_media::h264_enabled();
             println!("H.264 is {}", if on { "on" } else { "off" });
+        }
+        Command::Env => {
+            let report = env::report();
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.issues.is_empty() {
+                std::process::exit(1);
+            }
         }
         Command::Mcp => {
             tokio::runtime::Runtime::new()?.block_on(mcp::serve())?;

@@ -206,7 +206,8 @@ def layout(folder: Path, safe: tuple[int, int, int, int]) -> int:
 
 
 def video(path: Path, size: tuple[int, int] = (1920, 1080), max_seconds: float | None = None) -> int:
-    ffprobe, ffmpeg = shutil.which("ffprobe"), shutil.which("ffmpeg")
+    ffprobe = os.environ.get("OPENCUT_FFPROBE") or shutil.which("ffprobe")
+    ffmpeg = os.environ.get("OPENCUT_FFMPEG") or shutil.which("ffmpeg")
     if not ffprobe or not ffmpeg:
         print("error: ffprobe/ffmpeg not on PATH", file=sys.stderr)
         return 2

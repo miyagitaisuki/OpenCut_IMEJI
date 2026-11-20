@@ -1,0 +1,24 @@
+# docker compose up -d opencut   (then: docker compose exec opencut python scripts/opencut_ptc.py check)
+#
+# Only the pipeline is in this file. textts, AivisSpeech Engine and QBank run as their own
+# services: they are not in this repo, so their URLs come from .env (default: the host, via
+# host.docker.internal). Secrets (ANTHROPIC_API_KEY, YouTube keys) go in .env, never in the image.
+
+services:
+  opencut:
+    build: .
+    image: opencut-imeji:latest
+    env_file:
+      - path: .env
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./lessons:/app/lessons            # inputs and outputs of the lessons
+      - ./apps/intro/scenes:/app/apps/intro/scenes  # scene JSON, edited without a rebuild
+      - ./scripts:/app/scripts            # Python helpers, edited without a rebuild
+      - whisper-cache:/app/.cache/whisper # whisper model, kept between runs
+    command: ["python", "scripts/opencut_ptc.py", "check"]
+
+volumes:
+  whisper-cache:

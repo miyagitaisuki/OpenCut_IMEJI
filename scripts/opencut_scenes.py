@@ -39,7 +39,7 @@ class ScenesError(RuntimeError):
 
 
 def _lesson(*words: str, check: bool = True) -> subprocess.CompletedProcess:
-    node = shutil.which("node")
+    node = os.environ.get("OPENCUT_NODE") or shutil.which("node")
     if not node:
         raise ScenesError("needs Node.js (node 22+ on PATH)")
     done = subprocess.run([node, str(INTRO / "scripts" / "lesson.ts"), *words], cwd=INTRO,

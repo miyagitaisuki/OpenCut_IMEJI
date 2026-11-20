@@ -1,0 +1,22 @@
+# Build outputs and host-specific files: never copied into the image.
+.git
+target
+.cache
+**/node_modules
+apps/intro/out
+apps/intro/public/voices
+apps/intro/public/_lesson
+apps/intro/scenes/images
+scenes/images
+lessons
+**/*.mp4
+**/*.mp3
+**/*.wav
+**/*.png
+!apps/intro/public/**/*.png
+!apps/intro/public/avatars/**
+!brand/**/*.png
+.env
+.env.*
+!.env.example
+*.log
