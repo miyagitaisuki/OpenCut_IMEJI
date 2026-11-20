@@ -22,5 +22,17 @@
   "b09": "one_finger_up",
   "b10": "present_open",
   "b11": "hand_chest_tilt",
-  "b12": "point_left"
+  "b12": "point_left",
+  "c01": "surprised",
+  "c02": "happy_fist_chest",
+  "c03": "sad_rub_eye",
+  "c04": "thanks_hands_together",
+  "c05": "content_hand_chest",
+  "c06": "cheer_fists",
+  "c07": "sorry_sweat",
+  "c08": "worried_hands_up",
+  "c09": "thumbs_up",
+  "c10": "clap_happy",
+  "c11": "ok_signs",
+  "c12": "wrong_cross_arms"
 }
