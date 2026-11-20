@@ -76,6 +76,37 @@ is her smile once she has finished speaking.
 the repository. Put an avatar made from someone else's art in `public/avatars/` and
 add it to `.gitignore` if it should stay out of git.
 
+### 3D (VRM) and Live2D avatars
+
+Besides layered pictures an avatar folder can hold a model; `avatar.json` then
+names it instead of `layers`/`rig`:
+
+```json
+{ "name": "…", "size": [1, 1], "vrm": { "file": "model.vrm", "camera": [0, 1.3, 2.2], "target": [0, 1.18, 0] } }
+{ "name": "…", "size": [1, 1], "live2d": { "file": "Hiyori.model3.json", "zoom": 1.9, "center": [0.5, 0.84] } }
+```
+
+Mouth, blinking, nodding and (VRM) gestures follow the voice exactly as for
+the 2D rig; physics (swaying hair) is not run, since every frame is drawn on
+its own. Try them with the samples, which are fetched rather than kept in git:
+
+```sh
+bun run scripts/fetch-vrm-sample.ts       # pixi's sample VRM, VRM Public License 1.0
+bun run scripts/fetch-live2d-sample.ts    # Live2D's Cubism Core + the Hiyori sample model
+bun run speak scenes/n4-teshimau-vrm.json && bun run render scenes/n4-teshimau-vrm.props.json
+bun run speak scenes/n4-teshimau-live2d.json && bun run render scenes/n4-teshimau-live2d.props.json
+```
+
+Live2D: the Cubism Core is Live2D's proprietary code and a business with
+annual revenue over 10 million JPY needs a Cubism SDK Release License to
+publish content made with the SDK. Check https://www.live2d.com/en/sdk/license/
+before releasing lessons with it. Your own models go in their own folder
+under `public/avatars/`.
+
+AivisSpeech reports no mora lengths, so `speak` spreads the moras over the
+stretch where the voice really speaks (found in the wav); VOICEVOX's own
+timing is used as is.
+
 ## Licence
 
 Remotion is free for individuals and companies of up to three people; see

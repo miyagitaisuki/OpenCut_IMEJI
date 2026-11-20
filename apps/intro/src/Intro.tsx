@@ -12,6 +12,7 @@ import {
 
 import type { IntroProps } from "./types";
 import type { Mouth } from "./visemes";
+import { Live2dAvatar } from "./Live2dAvatar";
 import { VrmAvatar, type VrmPoseState } from "./VrmAvatar";
 import { mouthAt, mouthStateAt } from "./visemes";
 
@@ -40,7 +41,15 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
           transform: `translateY(${(1 - enter) * 400}px)`,
         }}
       >
-        {avatar.vrm ? (
+        {avatar.live2d ? (
+          <Live2dAvatar
+            folder={avatar.folder}
+            config={avatar.live2d}
+            width={1000}
+            height={1080}
+            state={vrmState(frame, fps, talking, voiceSeconds, visemes, gestureTimeline(scene.gestures, talking, LEAD_IN, fps))}
+          />
+        ) : avatar.vrm ? (
           <VrmAvatar
             folder={avatar.folder}
             config={avatar.vrm}

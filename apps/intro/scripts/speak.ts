@@ -11,7 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import type { AvatarManifest, IntroProps, Scene } from "../src/types";
-import { type AudioQuery, queryDuration, visemes } from "../src/visemes";
+import { type AudioQuery, lacksTiming, queryDuration, retime, visemes } from "../src/visemes";
 
 const root = resolve(import.meta.dir, "..");
 // AivisSpeech listens on 10101; VOICEVOX on 50021.
@@ -40,12 +40,17 @@ export async function speak(scenePath: string, engine: string): Promise<{ props:
   mkdirSync(join(root, "public", "voices"), { recursive: true });
   writeFileSync(join(root, "public", voiceRel), new Uint8Array(wav));
 
+  // AivisSpeech reports no mora lengths: find where the voice really speaks
+  // and spread the moras over that stretch.
+  const span = lacksTiming(query) ? speechSpan(new Uint8Array(wav)) : undefined;
+  const timing = span ? retime(query, span.start, span.end - span.start) : query;
+
   const props: IntroProps = {
     scene,
     avatar,
     voice: voiceRel,
     voiceSeconds: wavSeconds(new Uint8Array(wav)) ?? queryDuration(query),
-    visemes: visemes(query),
+    visemes: visemes(timing),
   };
   const propsPath = join(root, "scenes", `${name}.props.json`);
   writeFileSync(propsPath, `${JSON.stringify(props, null, 2)}\n`);
@@ -94,6 +99,49 @@ function wavSeconds(bytes: Uint8Array): number | undefined {
     const size = view.getUint32(offset + 4, true);
     if (id === 0x666d7420) byteRate = view.getUint32(offset + 16, true); // "fmt "
     if (id === 0x64617461 && byteRate) return size / byteRate; // "data"
+    offset += 8 + size + (size % 2);
+  }
+  return undefined;
+}
+
+/** First and last second the 16-bit PCM wav is louder than silence (ends trimmed of breath and room noise). */
+export function speechSpan(bytes: Uint8Array): { start: number; end: number } | undefined {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 44 || view.getUint32(0, false) !== 0x52494646) return undefined;
+  let offset = 12;
+  let rate = 0;
+  let channels = 1;
+  let bits = 16;
+  while (offset + 8 <= bytes.length) {
+    const id = view.getUint32(offset, false);
+    const size = view.getUint32(offset + 4, true);
+    if (id === 0x666d7420) {
+      channels = view.getUint16(offset + 10, true);
+      rate = view.getUint32(offset + 12, true);
+      bits = view.getUint16(offset + 22, true);
+    }
+    if (id === 0x64617461 && rate && bits === 16) {
+      const frames = Math.floor(Math.min(size, bytes.length - offset - 8) / (2 * channels));
+      const window = Math.max(1, Math.round(rate * 0.01));
+      const loud: boolean[] = [];
+      let peak = 0;
+      const rms: number[] = [];
+      for (let w = 0; w + window <= frames; w += window) {
+        let sum = 0;
+        for (let i = 0; i < window; i++) {
+          const v = view.getInt16(offset + 8 + (w + i) * 2 * channels, true);
+          sum += v * v;
+        }
+        const level = Math.sqrt(sum / window);
+        rms.push(level);
+        peak = Math.max(peak, level);
+      }
+      for (const level of rms) loud.push(level > peak * 0.05);
+      const first = loud.indexOf(true);
+      const last = loud.lastIndexOf(true);
+      if (first < 0) return undefined;
+      return { start: (first * window) / rate, end: ((last + 1) * window) / rate };
+    }
     offset += 8 + size + (size % 2);
   }
   return undefined;

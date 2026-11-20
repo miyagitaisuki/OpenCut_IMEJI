@@ -1,0 +1,39 @@
+{
+  "scene_type": "intro",
+  "avatar": "live2d-hiyori",
+  "subtitle": "N4 文法",
+  "title": "～てしまう",
+  "text": "みなさん、こんにちは。N4文法の授業へようこそ。今日は「てしまう」を勉強しましょう。",
+  "translation": "Xin chào các bạn. Chào mừng đến với bài học ngữ pháp N4. Hôm nay chúng ta học ～てしまう.",
+  "speaker": 1431611904,
+  "gestures": [
+    {
+      "at": 0,
+      "gesture": "rest"
+    },
+    {
+      "at": 0.9,
+      "gesture": "explain"
+    },
+    {
+      "at": 2.6,
+      "gesture": "pointer"
+    },
+    {
+      "at": 4.6,
+      "gesture": "tip"
+    }
+  ],
+  "effects": [
+    {
+      "at": 2.6,
+      "type": "exclamation",
+      "duration": 1.2
+    },
+    {
+      "at": 4.6,
+      "type": "lightbulb",
+      "duration": 1.4
+    }
+  ]
+}

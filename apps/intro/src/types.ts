@@ -1,3 +1,4 @@
+import type { Live2dConfig } from "./Live2dAvatar";
 import type { VrmConfig } from "./VrmAvatar";
 import type { Mouth, Viseme } from "./visemes";
 
@@ -51,6 +52,8 @@ export type AvatarManifest = {
   fx?: Record<string, string>;
   /** A 3D VRM model instead of the layered pictures (`layers` and `rig` are then unused). */
   vrm?: VrmConfig;
+  /** A Live2D (Cubism 3/4) model instead (needs public/lib/live2dcubismcore.min.js). */
+  live2d?: Live2dConfig;
   layers?: {
     body?: string;
     eyes_open: string;

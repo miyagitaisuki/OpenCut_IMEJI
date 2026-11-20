@@ -7,3 +7,8 @@ scenes/*.props.json
 
 # 10 MB sample VRM: fetched by scripts/fetch-vrm-sample.ts
 public/avatars/*/model.vrm
+
+# Live2D: Cubism Core and the sample model are fetched by scripts/fetch-live2d-sample.ts
+public/lib/
+public/avatars/live2d-*/*
+!public/avatars/live2d-*/avatar.json
