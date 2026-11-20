@@ -6,6 +6,13 @@ target/
 !.env.example
 docs/
 
+# Remotion's local Chrome build (317 MB; not source)
+.remotion/
+
+# Python caches
+__pycache__/
+.pytest_cache/
+
 # moon runtime cache
 .moon/cache/
 

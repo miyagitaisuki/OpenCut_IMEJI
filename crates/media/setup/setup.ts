@@ -222,6 +222,12 @@ function configureFlags(target: Platform, host: Platform): string[] {
       if (!Bun.which(`${prefix}clang`)) throw new Error(`${prefix}clang not on PATH: add llvm-mingw's bin/`);
       flags.push(
         "--target-os=mingw32",
+        // Windows' own hardware H.264 encoder (h264_mf): GPU encoding on
+        // Intel, NVIDIA and AMD, with no extra licence or library.
+        "--enable-mediafoundation",
+        // h264_mf is built against Direct3D 11 (its GPU path); without this
+        // flag FFmpeg does not compile it.
+        "--enable-d3d11va",
         `--arch=${target.arch}`,
         `--cross-prefix=${prefix}`,
         "--enable-cross-compile",

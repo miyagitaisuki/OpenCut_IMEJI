@@ -331,7 +331,7 @@ fn json<T: serde::Serialize>(result: Result<T, Failure>) -> Result<CallToolResul
     ))
 }
 
-/// An error with its causes, `outer: inner: …`.
+/// An error with its causes, `outer: inner: â€¦`.
 fn chain(error: anyhow::Error) -> Failure {
     Failure(format!("{error:#}"))
 }
