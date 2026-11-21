@@ -29,7 +29,7 @@ Hỏi số bài Minna (hoặc chủ đề), cấp độ (mặc định N5 với 
 - **Chữ trên slide**: phần giải thích (tiêu đề cảnh, `label`, `note`, `explain`, tiêu đề cột `compare`, `subtitle`) viết **tiếng Việt**, ngắn; phần **ví dụ, mẫu câu, từ vựng, câu hỏi và lựa chọn luyện tập** giữ **tiếng Nhật** có furigana. Lời đọc (kịch bản) vẫn toàn tiếng Nhật.
 - **Furigana cho mọi chữ Hán** theo cú pháp textts `漢字{かんじ}`, kể cả trong `visuals.json`.
 - **Câu ví dụ tự viết**, không chép nguyên văn hội thoại, bài tập hay ví dụ trong sách Minna (bản quyền). Được dùng tên mẫu ngữ pháp và từ vựng của bài.
-- Vai (giọng textts cố định): `[1]` **まい** (giáo viên, lời giảng), `[2]` **fumifumi** (học sinh nam), `[3]` **花音** (học sinh nữ). Hội thoại mẫu dùng `[2]`/`[3]`; trong cảnh `dialogue`, `who` ghi tên vai (ふみ, 花音{かのん}).
+- Vai (giọng textts cố định): `[1]` **Izumi** (giáo viên, lời giảng; giọng textts 1431611904), `[2]` **fumifumi** (học sinh nam), `[3]` **花音** (học sinh nữ). Hội thoại mẫu dùng `[2]`/`[3]`; trong cảnh `dialogue`, `who` ghi tên vai (ふみ, 花音{かのん}).
 - Bản dịch Việt tự nhiên, ngắn; giữ đúng một bản dịch cho mỗi dòng nói.
 - Mỗi câu ≤ 60 ký tự (không tính furigana) để phụ đề vừa hai dòng.
 - Cảnh: xoay vòng mẫu, không lặp cùng mẫu liền nhau. Cảnh chỉ dùng nửa trên màn hình, nên chữ phải ngắn: `compare` ≤ 5 mục, `dialogue` ≤ 5 dòng mỗi cảnh (hội thoại dài thì chia nhiều cảnh).

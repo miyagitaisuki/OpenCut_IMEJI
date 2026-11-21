@@ -143,7 +143,7 @@ node apps/intro/scripts/lesson.ts thumbnail lessons/x/x.thumb.json           # 1
 node apps/intro/scripts/lesson.ts short x.visuals.json lessons/x/x.project.json --grammar 13   # vertical Short, < 60 s
 ```
 
-Voices come from `scripts/lesson_voices.json` (role 1 まい, 2 fumifumi, 3 花音; change the
+Voices come from `scripts/lesson_voices.json` (role 1 Izumi (giọng まい cũ), 2 fumifumi, 3 花音; change the
 voice ids to yours). `textts` must run with ffmpeg on its PATH, or it answers HTTP 500 and writes
 empty MP3s. The music and sounds in `assets/audio/` are synthesised by `lesson_audio.py make`
 (CC0, see `assets/audio/CREDITS.md`); `--bgm FILE` uses a recorded track instead.
