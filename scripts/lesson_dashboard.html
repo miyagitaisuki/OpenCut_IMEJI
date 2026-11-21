@@ -99,8 +99,9 @@
   .counts { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); }
   .counts button { font-size: 12px; padding: 2px 10px; border-radius: 999px; }
   .counts button.on { outline: 2px solid var(--b); }
+  :focus-visible { outline: 2px solid var(--b); outline-offset: 2px; }
   .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line-ctrl); color: var(--ink-3); background: var(--bg-hover); }
+  .chip { display: inline-block; white-space: nowrap; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line-ctrl); color: var(--ink-3); background: var(--bg-hover); }
   .chip.running, .chip.publishing, .chip.queued, .chip.queued_publish, .chip.queued_finish, .chip.waiting_quota { color: var(--info-fg); background: var(--info-bg); border-color: var(--info-bd); }
   .chip.awaiting_approval, .chip.quarantine { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-bd); }
   .chip.done { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-bd); }
@@ -206,7 +207,7 @@ function renderControls() {
   const counts = {};
   jobs.forEach((j) => { counts[j.status] = (counts[j.status] || 0) + 1; });
   $("counts").innerHTML = Object.keys(LABEL).filter((k) => counts[k]).map((k) =>
-    `<button data-filter="${k}" class="${statusFilter === k ? "on" : ""}">${esc(LABEL[k])} ${counts[k]}</button>`).join("") ||
+    `<button data-filter="${k}" aria-pressed="${statusFilter === k}" class="${statusFilter === k ? "on" : ""}">${esc(LABEL[k])} ${counts[k]}</button>`).join("") ||
     `<span class="mut" style="font-size:12px">Chưa có bài nào</span>`;
   $("counts").querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => {
     statusFilter = statusFilter === b.dataset.filter ? "all" : b.dataset.filter;
@@ -230,13 +231,20 @@ async function loadJobs() {
   const shown = jobs.filter((j) => matches(j, query));
   $("empty").style.display = shown.length ? "none" : "block";
   $("empty").textContent = jobs.length ? "Không có bài khớp bộ lọc." : "Chưa có bài nào.";
+  const focusedId = document.activeElement?.closest?.("tr.row")?.dataset.id;  // keep keyboard focus across the 5 s refresh
   $("jobs").innerHTML = shown.map((j) => `
-    <tr class="row ${j.id === selected ? "on" : ""}" data-id="${esc(j.id)}">
+    <tr class="row ${j.id === selected ? "on" : ""}" data-id="${esc(j.id)}" tabindex="0" aria-selected="${j.id === selected}">
       <td>${esc(j.spec?.title || j.spec?.name || j.id)}<div class="mut" style="font-size:12px">${esc(j.spec?.name || "")}</div></td>
       <td>${chip(j.status)}</td>
       <td class="mut" style="font-size:12px">${when(j.updated)}</td>
     </tr>`).join("");
-  document.querySelectorAll("tr.row").forEach((tr) => tr.addEventListener("click", () => select(tr.dataset.id)));
+  if (focusedId) document.querySelector(`tr.row[data-id="${CSS.escape(focusedId)}"]`)?.focus();
+  document.querySelectorAll("tr.row").forEach((tr) => {
+    tr.addEventListener("click", () => select(tr.dataset.id));
+    tr.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(tr.dataset.id); }
+    });
+  });
   if (selected) renderDetail();
 }
 
