@@ -64,6 +64,21 @@ export type DialogueScene = Timing & {
   lines: { who?: string; text: string; side?: "left" | "right" }[];
 };
 
+/**
+ * Visual novel: a sprite stands beside a text box, and each line names the speaker.
+ * Lines play in order over the first part of the scene; then an optional choice card
+ * shows the options, and the right one lights up at the end.
+ */
+export type VnScene = Timing & {
+  template: "vn";
+  /** Sprite file under `public/`. Used until a line names another. */
+  sprite: string;
+  /** Background file under `public/`. Absent: a soft gradient. */
+  background?: string;
+  lines: { who: string; text: string; sprite?: string }[];
+  choice?: { question: string; options: string[]; answer: number };
+};
+
 /** Used when no scene covers a cue: the cue's key word, big. */
 export type KeywordScene = {
   template: "keyword";
@@ -116,6 +131,7 @@ export type LessonScene =
   | CompareScene
   | ChartScene
   | DialogueScene
+  | VnScene
   | KeywordScene;
 
 /** What a teacher writes (`cue` is needed on every scene but the default). */

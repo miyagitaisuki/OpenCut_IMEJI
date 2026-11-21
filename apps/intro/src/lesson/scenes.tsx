@@ -1,9 +1,9 @@
-import { Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
 import { Accent } from "./Accent";
 import { C, FIRST, FONT, Jp, Pop, SAFE, SHADOW, STAGGER, SceneFrame, TONES, useReveal } from "./theme";
 import { practiceTiming } from "./practice";
-import type { ExamplesScene, PracticeScene, ChartScene, CompareScene, DialogueScene, GrammarScene, ImageScene, KeywordScene, LessonScene, TitleScene } from "./types";
+import type { ExamplesScene, PracticeScene, ChartScene, CompareScene, DialogueScene, GrammarScene, ImageScene, KeywordScene, LessonScene, TitleScene, VnScene } from "./types";
 
 type P<T> = { scene: T; duration: number };
 
@@ -379,6 +379,87 @@ export const Dialogue: React.FC<P<DialogueScene>> = ({ scene, duration }) => {
   );
 };
 
+/**
+ * Visual novel prototype: the sprite stands on the left, the text box sits at the bottom.
+ * Lines take the first 65% of the scene when there is a choice, else all of it.
+ */
+export const Vn: React.FC<P<VnScene>> = ({ scene, duration }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const t = frame / fps;
+  const n = scene.lines.length;
+  const talkEnd = scene.choice ? duration * 0.65 : duration;
+  const idx = Math.min(n - 1, Math.floor(t / (talkEnd / n)));
+  let sprite = scene.sprite;
+  for (let i = 0; i <= idx; i++) sprite = scene.lines[i].sprite ?? sprite;
+  const line = scene.lines[idx];
+  const choiceOn = !!scene.choice && t >= talkEnd;
+  const reveal = !!scene.choice && t >= duration - 1.5;
+  return (
+    <AbsoluteFill style={{ background: scene.background ? "#fff" : "linear-gradient(180deg, #fff7fb 0%, #eaf4ff 100%)", fontFamily: FONT }}>
+      {scene.background ? (
+        <AbsoluteFill>
+          <Img src={staticFile(scene.background)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </AbsoluteFill>
+      ) : null}
+      <Img
+        key={sprite}
+        src={staticFile(sprite)}
+        // Sits under the text box, which hides the cut at the waist.
+        style={{ position: "absolute", right: 120, bottom: 200, width: 860, filter: "drop-shadow(0 18px 30px rgba(43, 58, 103, 0.18))" }}
+      />
+      <div
+        key={idx}
+        style={{
+          position: "absolute",
+          left: 420,
+          right: 80,
+          bottom: 60,
+          minHeight: 210,
+          background: "#fff",
+          borderRadius: 30,
+          border: `4px solid ${C.pink}`,
+          boxShadow: SHADOW,
+          padding: "58px 40px 28px",
+        }}
+      >
+        <div style={{ position: "absolute", top: -26, left: 36, background: C.navy, color: "#fff", borderRadius: 20, padding: "6px 26px" }}>
+          <Jp text={line.who} style={{ fontSize: 36, fontWeight: 800 }} />
+        </div>
+        <Jp text={line.text} style={{ fontSize: 50, fontWeight: 600, color: C.ink, lineHeight: 1.5 }} />
+      </div>
+      {choiceOn && scene.choice ? (
+        <div
+          style={{ position: "absolute", left: 80, top: 130, width: 640, background: "#fff", borderRadius: 30, boxShadow: SHADOW, padding: 36 }}
+        >
+          <Jp text={scene.choice.question} style={{ fontSize: 42, fontWeight: 700, color: C.navy }} />
+          {scene.choice.options.map((o, i) => {
+            const right = reveal && i === scene.choice!.answer;
+            return (
+              <div
+                key={i}
+                style={{
+                  marginTop: 16,
+                  borderRadius: 20,
+                  padding: "16px 24px",
+                  fontSize: 40,
+                  fontWeight: 700,
+                  color: C.ink,
+                  background: right ? C.mint : "#fff",
+                  border: `3px solid ${right ? "#7fcfb0" : C.pink}`,
+                  opacity: reveal && !right ? 0.45 : 1,
+                }}
+              >
+                <Jp text={`${String.fromCharCode(65 + i)}. ${o}`} />
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
 export const Keyword: React.FC<P<KeywordScene>> = ({ scene, duration }) => (
   <SceneFrame duration={duration}>
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}>
@@ -534,7 +615,7 @@ export const Practice: React.FC<P<PracticeScene>> = ({ scene, duration }) => {
   );
 };
 
-const Body: React.FC<{ scene: LessonScene; duration: number; beats?: number[] }> = ({ scene, duration, beats }) => {
+const Body: React.FC<{ scene: LessonScene; duration: number; beats?: number[]; length?: number }> = ({ scene, duration, beats, length }) => {
   switch (scene.template) {
     case "title":
       return <Title scene={scene} duration={duration} />;
@@ -557,15 +638,18 @@ const Body: React.FC<{ scene: LessonScene; duration: number; beats?: number[] }>
           <Accent kind="check" at={practiceTiming(duration, scene.think ?? 5, scene.options.length).reveal} />
         </>
       );
+    case "vn":
+      // Lesson passes a huge `duration` so the transition does the leaving; `length` is the real time.
+      return <Vn scene={scene} duration={length ?? duration} />;
     case "keyword":
       return <Keyword scene={scene} duration={duration} />;
   }
 };
 
 /** A scene, with its accent sticker over it when the scene asks for one. */
-export const SceneView: React.FC<{ scene: LessonScene; duration: number; beats?: number[] }> = ({ scene, duration, beats }) => (
+export const SceneView: React.FC<{ scene: LessonScene; duration: number; beats?: number[]; length?: number }> = ({ scene, duration, beats, length }) => (
   <>
-    <Body scene={scene} duration={duration} beats={beats} />
+    <Body scene={scene} duration={duration} beats={beats} length={length} />
     {"accent" in scene && scene.accent ? <Accent kind={scene.accent} at={scene.accent_at ?? 0.8} /> : null}
   </>
 );

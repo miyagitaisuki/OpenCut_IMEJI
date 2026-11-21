@@ -2,7 +2,7 @@
 
 import { existsSync } from "node:fs";
 
-const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image", "practice", "examples"];
+const TEMPLATES = ["title", "grammar", "compare", "chart", "dialogue", "image", "practice", "examples", "vn"];
 const TONES = ["pink", "navy", "mint", "sun", "sky"];
 const ACCENTS = ["check", "cross", "star"];
 
@@ -104,6 +104,22 @@ export function validate(data: unknown, cueCount: number, pictureExists: (src: s
         if (!list(raw.options, 2) || (raw.options as unknown[]).length > 4 || !(raw.options as unknown[]).every(str)) errors.push(`${here}: options needs 2 to 4 non-empty strings`);
         else if (!Number.isInteger(raw.answer) || (raw.answer as number) < 0 || (raw.answer as number) >= (raw.options as unknown[]).length) errors.push(`${here}: answer must be an index into options`);
         if (raw.think !== undefined && (typeof raw.think !== "number" || raw.think < 0 || raw.think > 30)) errors.push(`${here}: think must be 0..30 seconds`);
+        break;
+      case "vn":
+        if (!str(raw.sprite)) errors.push(`${here}: sprite is required`);
+        else if (!pictureExists(raw.sprite as string)) errors.push(`${here}: sprite not found: ${raw.sprite}`);
+        if (!list(raw.lines) || (raw.lines as unknown[]).length < 1) errors.push(`${here}: lines needs at least one line`);
+        else
+          (raw.lines as unknown[]).forEach((l, i) => {
+            if (!isObj(l) || !str(l.who) || !str(l.text)) errors.push(`${here}: lines[${i}] needs who and text`);
+            else if (l.sprite !== undefined && (!str(l.sprite) || !pictureExists(l.sprite as string))) errors.push(`${here}: lines[${i}].sprite not found: ${l.sprite}`);
+          });
+        if (raw.choice !== undefined) {
+          const ch = raw.choice as Obj;
+          if (!isObj(ch) || !str(ch.question)) errors.push(`${here}: choice.question is required`);
+          else if (!list(ch.options, 2) || (ch.options as unknown[]).length > 4 || !(ch.options as unknown[]).every(str)) errors.push(`${here}: choice.options needs 2 to 4 strings`);
+          else if (!Number.isInteger(ch.answer) || (ch.answer as number) < 0 || (ch.answer as number) >= (ch.options as unknown[]).length) errors.push(`${here}: choice.answer must be an index into options`);
+        }
         break;
       case "image":
         if (!list(raw.images) || (raw.images as unknown[]).length > 3) errors.push(`${here}: images needs 1 to 3 entries`);
