@@ -94,6 +94,11 @@
   button.p { background: var(--b-btn); color: #fff; border-color: var(--b-btn); }
   button.p:hover:not(:disabled) { background: var(--b-btn-hover); }
   button.d { color: var(--err); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .toolbar input { flex: 1; min-width: 160px; }
+  .counts { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .counts button { font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+  .counts button.on { outline: 2px solid var(--b); }
   .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line-ctrl); color: var(--ink-3); background: var(--bg-hover); }
   .chip.running, .chip.publishing, .chip.queued, .chip.queued_publish, .chip.queued_finish, .chip.waiting_quota { color: var(--info-fg); background: var(--info-bg); border-color: var(--info-bd); }
@@ -121,6 +126,12 @@
   <section class="card">
     <h2>Bài giảng <span class="mut" id="count"></span></h2>
     <div class="body" style="padding:0">
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="Tìm theo tên hoặc mã" aria-label="Tìm bài">
+        <select id="filter" aria-label="Lọc theo trạng thái"></select>
+        <button id="clear-finished" title="Xóa các bài đã xong, lỗi hoặc đã hủy khỏi danh sách">Xóa bài đã kết thúc</button>
+      </div>
+      <div class="counts" id="counts"></div>
       <table>
         <thead><tr><th>Bài</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead>
         <tbody id="jobs"></tbody>
@@ -145,6 +156,8 @@ const LABEL = {
 };
 let selected = null;
 let jobs = [];
+let statusFilter = "all";
+const FINISHED = ["done", "failed", "cancelled"];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -176,6 +189,33 @@ async function api(method, path, body) {
   return data;
 }
 
+function matches(job, query) {
+  if (statusFilter !== "all" && job.status !== statusFilter) return false;
+  if (!query) return true;
+  const hay = [job.spec?.title, job.spec?.name, job.id].join(" ").toLowerCase();
+  return hay.includes(query);
+}
+
+function renderControls() {
+  const select = $("filter");
+  if (!select.options.length) {
+    select.innerHTML = `<option value="all">Tất cả trạng thái</option>` +
+      Object.entries(LABEL).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  }
+  select.value = statusFilter;
+  const counts = {};
+  jobs.forEach((j) => { counts[j.status] = (counts[j.status] || 0) + 1; });
+  $("counts").innerHTML = Object.keys(LABEL).filter((k) => counts[k]).map((k) =>
+    `<button data-filter="${k}" class="${statusFilter === k ? "on" : ""}">${esc(LABEL[k])} ${counts[k]}</button>`).join("") ||
+    `<span class="mut" style="font-size:12px">Chưa có bài nào</span>`;
+  $("counts").querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => {
+    statusFilter = statusFilter === b.dataset.filter ? "all" : b.dataset.filter;
+    loadJobs();
+  }));
+  const finished = jobs.filter((j) => FINISHED.includes(j.status)).length;
+  $("clear-finished").disabled = finished === 0;
+}
+
 async function loadJobs() {
   try {
     jobs = await api("GET", "/jobs");
@@ -185,8 +225,12 @@ async function loadJobs() {
   }
   $("stamp").textContent = "Cập nhật " + new Date().toLocaleTimeString("vi-VN");
   $("count").textContent = `(${jobs.length})`;
-  $("empty").style.display = jobs.length ? "none" : "block";
-  $("jobs").innerHTML = jobs.map((j) => `
+  renderControls();
+  const query = $("q").value.trim().toLowerCase();
+  const shown = jobs.filter((j) => matches(j, query));
+  $("empty").style.display = shown.length ? "none" : "block";
+  $("empty").textContent = jobs.length ? "Không có bài khớp bộ lọc." : "Chưa có bài nào.";
+  $("jobs").innerHTML = shown.map((j) => `
     <tr class="row ${j.id === selected ? "on" : ""}" data-id="${esc(j.id)}">
       <td>${esc(j.spec?.title || j.spec?.name || j.id)}<div class="mut" style="font-size:12px">${esc(j.spec?.name || "")}</div></td>
       <td>${chip(j.status)}</td>
@@ -218,6 +262,7 @@ async function renderDetail() {
     ["failed", "cancelled", "quarantine"].includes(job.status) ? `<button data-act="retry">Chạy lại</button>` : "",
     ["failed", "quarantine"].includes(job.status) ? `<button data-act="force">Chạy lại toàn bộ</button>` : "",
     job.status === "awaiting_approval" ? `<button class="p" data-act="publish">Duyệt đăng YouTube</button>` : "",
+    FINISHED.includes(job.status) ? `<button class="d" data-act="delete">Xóa khỏi danh sách</button>` : "",
     ["queued", "running", "queued_publish", "queued_finish", "waiting_quota", "quarantine", "awaiting_approval"].includes(job.status) ? `<button class="d" data-act="cancel">Hủy</button>` : "",
   ].join("");
   $("detail").innerHTML = `
@@ -285,6 +330,11 @@ async function act(name, job) {
       if (!confirm("Hủy bài này?")) return;
       await api("POST", `/jobs/${job.id}/cancel`, {});
     }
+    if (name === "delete") {
+      if (!confirm("Xóa bài này khỏi danh sách? File bài giảng trong lessons/ vẫn được giữ.")) return;
+      await api("DELETE", `/jobs/${job.id}`);
+      selected = null;
+    }
     if (name === "publish") {
       if (!confirm("Đăng bài này lên YouTube? Chỉ làm khi bạn đã xem video và QC báo đạt.")) return;
       await api("POST", `/jobs/${job.id}/publish`, {});
@@ -295,6 +345,21 @@ async function act(name, job) {
     toast("Lỗi: " + e.message);
   }
 }
+
+$("q").addEventListener("input", () => loadJobs());
+$("filter").addEventListener("change", (e) => { statusFilter = e.target.value; loadJobs(); });
+$("clear-finished").addEventListener("click", async () => {
+  const targets = jobs.filter((j) => FINISHED.includes(j.status));
+  if (!targets.length) return;
+  if (!confirm(`Xóa ${targets.length} bài đã kết thúc khỏi danh sách? File bài giảng trong lessons/ vẫn được giữ.`)) return;
+  let done = 0;
+  for (const j of targets) {
+    try { await api("DELETE", `/jobs/${j.id}`); done++; } catch (e) { /* keep going, report at the end */ }
+  }
+  if (targets.some((j) => j.id === selected)) selected = null;
+  toast(`Đã xóa ${done}/${targets.length} bài`);
+  loadJobs();
+});
 
 // Theme: the same switch as QBank (localStorage "color-scheme").
 function applyTheme(mode) {

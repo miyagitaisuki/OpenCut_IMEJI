@@ -5,7 +5,7 @@ Tạo từng hình bằng Gemini (Google AI Pro), tải về và **đặt đúng
 **Cách dùng:** dán *Phong cách chung* + *Prompt* của từng hình vào Gemini. Chọn tỉ lệ **4:3** hoặc vuông. Nếu hình có chữ thì yêu cầu tạo lại ("no text").
 
 **Phong cách chung (dán kèm mỗi prompt):**
-> Cute flat vector illustration, soft pastel palette (pink #ffc4d6, navy #2b3a67, mint, light yellow), simple rounded shapes, gentle shading, plain off-white background, centered subject with margin, no text, no letters, no logos, friendly anime-inspired style suitable for a Japanese lesson for beginners.
+> Cute flat vector illustration, soft pastel palette (IMEJI blue #bfdbfe, navy #1e3a8a, mint #d0fae5, light yellow #fef3c6), simple rounded shapes, gentle shading, plain off-white background, centered subject with margin, no text, no letters, no logos, friendly anime-inspired style suitable for a Japanese lesson for beginners.
 
 | # | File | Câu ví dụ | Prompt |
 |---|---|---|---|

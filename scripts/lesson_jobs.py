@@ -18,6 +18,7 @@ Endpoints (JSON in and out; listens on 127.0.0.1 only):
   GET  /jobs/<id>            one job (stages, outputs, error)
   GET  /jobs/<id>/log        the job's log (text)
   POST /jobs/<id>/cancel     drop a queued job or stop a running one
+  DELETE /jobs/<id>          remove a finished job (done, failed or cancelled) from the list; its lesson files stay
   POST /jobs/<id>/retry      requeue a failed, cancelled or quarantined job; body {"force": true} reruns every stage
   POST /jobs/<id>/accept     a quarantined job, reviewed by a person: continue to mix, QC and the publish check
   POST /jobs/<id>/publish    upload to YouTube (job must be `awaiting_approval`)
@@ -58,6 +59,7 @@ import json
 import os
 import queue
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -174,6 +176,13 @@ class Store:
 
     def log_path(self, job_id: str) -> Path:
         return self.root / job_id / "job.log"
+
+    def delete(self, job_id: str) -> None:
+        """Forget a job: its rows and its log folder. The lesson's own files under lessons/ stay."""
+        with self.lock, self.db:
+            self.db.execute("DELETE FROM stages WHERE job_id=?", (job_id,))
+            self.db.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+        shutil.rmtree(self.root / job_id, ignore_errors=True)
 
 
 def validate(body: dict) -> dict:
@@ -326,6 +335,14 @@ class Runner:
             job["status"] = "cancelled"
             self.store.save(job)
         return job
+
+    def delete(self, job_id: str) -> None:
+        job = self.store.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        if job["status"] not in ("done", "failed", "cancelled"):
+            raise JobError(f"only finished jobs can be removed; this one is {job['status']}")
+        self.store.delete(job_id)
 
     def retry(self, job_id: str, force: bool = False) -> dict:
         """Requeues a failed, cancelled or quarantined job. Stages that finished ("done") keep their result and
@@ -798,6 +815,20 @@ def make_handler(store: Store, runner: Runner, token: str | None = None):
                     return self._send(202, runner.accept(parts[1]))
                 if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "publish":
                     return self._send(202, runner.approve_publish(parts[1], dict(body)))
+                self._send(404, {"error": "not found"})
+            except KeyError:
+                self._send(404, {"error": "no such job"})
+            except JobError as error:
+                self._send(400, {"error": str(error)})
+
+        def do_DELETE(self):
+            parts = [p for p in self.path.split("?")[0].split("/") if p]
+            if not authorized(self.headers.get("Authorization"), token):
+                return self._send(401, {"error": f"missing or wrong Bearer token (set {TOKEN_ENV})"})
+            try:
+                if len(parts) == 2 and parts[0] == "jobs":
+                    runner.delete(parts[1])
+                    return self._send(200, {"deleted": parts[1]})
                 self._send(404, {"error": "not found"})
             except KeyError:
                 self._send(404, {"error": "no such job"})

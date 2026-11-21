@@ -21,7 +21,7 @@ Hỏi số bài Minna (hoặc chủ đề), cấp độ (mặc định N5 với 
 3. **Ngữ pháp**: mỗi mẫu câu gồm câu giới thiệu + ví von (cảnh `grammar`), rồi **ít nhất 3 câu ví dụ, mỗi câu một dòng** (cảnh `examples`: mỗi thẻ có hình `images/<ten-hinh>.png` + câu Nhật + dịch Việt, thẻ hiện lên đúng lúc câu đó được đọc; mỗi hình một dòng trong `pictures.md`). Dùng `compare` khi so hai mẫu dễ nhầm.
 4. **Hội thoại mẫu** (6–10 câu, 2 vai): cảnh `dialogue` (bubbles).
 5. **Luyện tập** (3–5 câu hỏi): mỗi câu hỏi gồm 1 dòng đọc câu hỏi, 1 dòng `[pause=5000]`, 1 dòng đọc đáp án và lý do. Cảnh `practice` (`think` 5 s) đặt ở dòng đọc câu hỏi, `until_cue` đến hết dòng đáp án.
-6. **Tổng kết + rủ học bài sau cùng cô Sakura** (2–3 câu; không nhắc QBank). Cảnh `title` hoặc `grammar` tóm tắt, kèm `accent: "star"`.
+6. **Tổng kết + rủ học bài sau cùng cô Izumi** (2–3 câu; không nhắc QBank). Cảnh `title` hoặc `grammar` tóm tắt, kèm `accent: "star"`.
 
 ## 3. Quy tắc nội dung
 - Lời giảng **toàn tiếng Nhật**, đúng trình độ: N5 dùng thể です/ます, câu ngắn ≤ 40 ký tự, chỉ dùng từ đã học tới bài đó; giải thích ngữ pháp bằng câu đơn giản.

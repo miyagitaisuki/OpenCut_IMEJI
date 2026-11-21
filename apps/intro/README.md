@@ -3,7 +3,7 @@
 Remotion scenes in which a 2D avatar says the lesson's opening line, its
 mouth following the vowels AivisSpeech (or VOICEVOX) reports for each mora:
 あいうえお, closed for ん, っ, pauses and ま・ば・ぱ. She breathes, sways
-and blinks, sakura petals drift, and the lesson's title is on a card
+and blinks, and the lesson's title is on a card
 beside her.
 
 ## Make an intro
@@ -13,7 +13,7 @@ beside her.
    ```json
    {
      "scene_type": "intro",
-     "avatar": "sakura",
+     "avatar": "izumi",
      "subtitle": "N4 文法",
      "title": "～てしまう",
      "text": "みなさん、こんにちは。N4文法の授業へようこそ。今日は「てしまう」を勉強しましょう。",
@@ -24,7 +24,7 @@ beside her.
 
    `speaker` is an AivisSpeech style id (the same ids as textts' `roles.yaml`);
    left out, the engine's first voice speaks. `speed` (1 = normal) and
-   `colors` (`["#ffd6e4", "#2b3a67"]`, the background) are optional.
+   `colors` (`["#eff6ff", "#1e3a8a"]`, the background) are optional.
 
 2. With AivisSpeech running, voice it, then render it:
 
@@ -46,7 +46,7 @@ beside her.
 
    The lesson's audio, slides, subtitles and markers move after the intro;
    `--outro` adds a closing clip the same way. `scenes/outro.json` is a
-   ready outro (sakura points the lesson's learners to QBank): voice and
+   ready outro (Izumi points the lesson's learners to QBank): voice and
    render it exactly like an intro.
 
 No engine at hand? `bun run scripts/mock-engine.ts` serves a stand-in on
@@ -169,7 +169,7 @@ A scene picks gestures over time:
 (`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
 is her smile once she has finished speaking.
 
-`demo` (original SVG art) and `sakura` (the owner's own character, a rigged PNG set) are in
+`demo` (original SVG art) and `izumi` (the owner's own character, a rigged PNG set) are in
 the repository. Put an avatar made from someone else's art in `public/avatars/` and
 add it to `.gitignore` if it should stay out of git.
 

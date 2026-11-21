@@ -59,8 +59,8 @@ def lottie(name, layers):
 
 pop = [(0, [0, 0, 100]), (10, [112, 112, 100]), (18, [100, 100, 100])]
 
-check = lottie("check", [layer([stroke([[-38, 2], [-10, 30], [42, -28]], "#ffffff", 20, 14, 30), disc("#6fcaa5")], pop)])
-cross = lottie("cross", [layer([stroke([[-28, -28], [28, 28]], "#ffffff", 20, 14, 24), stroke([[28, -28], [-28, 28]], "#ffffff", 20, 22, 32), disc("#f2859f")], pop)])
+check = lottie("check", [layer([stroke([[-38, 2], [-10, 30], [42, -28]], "#ffffff", 20, 14, 30), disc("#007a55")], pop)])
+cross = lottie("cross", [layer([stroke([[-28, -28], [28, 28]], "#ffffff", 20, 14, 24), stroke([[28, -28], [-28, 28]], "#ffffff", 20, 22, 32), disc("#d70037")], pop)])
 
 
 def star_points(r_out, r_in):
@@ -75,8 +75,8 @@ def star_points(r_out, r_in):
 
 star_shape = group([
     {"ty": "sh", "ks": static({"i": [[0, 0]] * 10, "o": [[0, 0]] * 10, "v": star_points(82, 38), "c": True})},
-    {"ty": "fl", "c": static(rgb("#f6c444")), "o": static(100)},
-    {"ty": "st", "c": static(rgb("#f0b94a")), "o": static(100), "w": static(8), "lc": 2, "lj": 2},
+    {"ty": "fl", "c": static(rgb("#ffd230")), "o": static(100)},
+    {"ty": "st", "c": static(rgb("#fe9a00")), "o": static(100), "w": static(8), "lc": 2, "lj": 2},
 ])
 star = lottie("star", [layer([star_shape], [(0, [0, 0, 100]), (12, [125, 125, 100]), (22, [100, 100, 100])], rot=[(0, [-90]), (22, [0])])])
 
