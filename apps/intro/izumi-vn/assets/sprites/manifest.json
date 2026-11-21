@@ -1,0 +1,65 @@
+{
+  "canvas": [
+    1024,
+    700
+  ],
+  "cut_y": 700,
+  "outfit": "O01",
+  "gesture": "G01",
+  "anchor": "assets/source/7.png",
+  "prompt_file": "apps/intro/izumi-vn/expression-prompts.md",
+  "files": {
+    "O01_E01_G01.png": {
+      "expression": "E01",
+      "label": "neutral",
+      "source_image": "images/1.png",
+      "status": "ok"
+    },
+    "O01_E02_G01.png": {
+      "expression": "E02",
+      "label": "smile",
+      "source_image": "images/2.png",
+      "status": "ok"
+    },
+    "O01_E03_G01.png": {
+      "expression": "E03",
+      "label": "happy",
+      "source_image": "images/3.png",
+      "status": "ok"
+    },
+    "O01_E04_G01.png": {
+      "expression": "E04",
+      "label": "angry",
+      "source_image": "images/4.png",
+      "status": "ok"
+    },
+    "O01_E05_G01.png": {
+      "expression": "E05",
+      "label": "sad",
+      "source_image": "images/5.png",
+      "status": "ok"
+    },
+    "O01_E06_G01.png": {
+      "expression": "E06",
+      "label": "shy",
+      "source_image": "images/6.png",
+      "status": "ok"
+    },
+    "O01_E07_G01.png": {
+      "expression": "E07",
+      "label": "surprised",
+      "source_image": "images/7.png",
+      "status": "ok"
+    },
+    "O01_E08_G01.png": {
+      "expression": "E08",
+      "label": "worried",
+      "source_image": "images/8.png",
+      "status": "ok"
+    }
+  },
+  "pending": {
+    "O01_E09_G01.png": "thinking, sailor collar: loi trang phuc, chua sinh lai",
+    "O01_E10_G01.png": "wink: sai khung, chua sinh lai"
+  }
+}
