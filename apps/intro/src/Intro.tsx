@@ -24,7 +24,7 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const seconds = frame / fps;
-  const [from, to] = scene.colors ?? ["#ffd6e4", "#2b3a67"];
+  const [from, to] = scene.colors ?? ["#eff6ff", "#1e3a8a"];
 
   const enter = spring({ frame, fps, config: { damping: 14 } });
   const card = spring({ frame: frame - fps * 0.3, fps, config: { damping: 16 } });
@@ -98,13 +98,13 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
               fontWeight: 700,
               padding: "8px 32px",
               borderRadius: 999,
-              background: "#e2405f",
+              background: "#2563eb",
             }}
           >
             {scene.subtitle}
           </div>
         )}
-        {scene.title && <div style={{ fontSize: 150, fontWeight: 900, marginTop: 24, lineHeight: 1.1 }}>{scene.title}</div>}
+        {scene.title && <div style={{ fontFamily: '"Noto Serif JP", "Noto Serif CJK JP", "Playfair Display", serif', fontSize: 150, fontWeight: 700, marginTop: 24, lineHeight: 1.1 }}>{scene.title}</div>}
       </div>
       <Caption text={scene.text} translation={scene.translation} visible={talking > -0.2} />
       {voice && (
@@ -376,7 +376,7 @@ const Caption: React.FC<{ text: string; translation?: string; visible: boolean }
       }}
     >
       <div style={{ fontSize: 44, lineHeight: 1.55 }}>{text}</div>
-      {translation && <div style={{ fontSize: 32, lineHeight: 1.45, color: "#ffe58a", marginTop: 8 }}>{translation}</div>}
+      {translation && <div style={{ fontSize: 32, lineHeight: 1.45, color: "#ffd230", marginTop: 8 }}>{translation}</div>}
     </div>
   </div>
 );

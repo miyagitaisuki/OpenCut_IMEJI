@@ -24,7 +24,7 @@ beside her.
 
    `speaker` is an AivisSpeech style id (the same ids as textts' `roles.yaml`);
    left out, the engine's first voice speaks. `speed` (1 = normal) and
-   `colors` (`["#ffd6e4", "#2b3a67"]`, the background) are optional.
+   `colors` (`["#eff6ff", "#1e3a8a"]`, the background) are optional.
 
 2. With AivisSpeech running, voice it, then render it:
 

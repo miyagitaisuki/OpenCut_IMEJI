@@ -4,29 +4,32 @@ import type { CSSProperties, ReactNode } from "react";
 
 import type { Tone } from "./types";
 
-/** Light and pastel to sit with the pink-and-navy chibi. */
+/** Bảng màu IMEJI (tokens.css của hệ thống thiết kế IMEJI). Xem DESIGN.md. */
 export const C = {
-  cream: "#fff8f1",
-  pinkSoft: "#ffe3ec",
-  pink: "#ffc4d6",
-  rose: "#f2859f",
-  navy: "#2b3a67",
-  navySoft: "#4b5b8c",
-  mint: "#c8eedd",
-  sun: "#ffe7a8",
-  sky: "#d3e5ff",
-  ink: "#26304f",
-  muted: "#6b7699",
+  cream: "#f8fafc", // slate-50
+  pinkSoft: "#eff6ff", // primary-50
+  pink: "#bfdbfe", // primary-200
+  rose: "#60a5fa", // primary-400
+  navy: "#1e3a8a", // primary-900
+  navySoft: "#1d4ed8", // primary-700
+  mint: "#d0fae5", // success-100
+  sun: "#fef3c6", // warning-100
+  sky: "#dbeafe", // primary-100
+  ink: "#0f172a", // slate-900
+  muted: "#526177", // slate-500
 };
+
+/** Tiêu đề dùng serif (IMEJI: Playfair Display; tiếng Nhật dùng Noto Serif JP). */
+export const SERIF = '"Noto Serif JP", "Noto Serif CJK JP", "Playfair Display", serif';
 
 export const FONT = '"Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif';
 
 export const TONES: Record<Tone, { bg: string; fg: string; line: string }> = {
   pink: { bg: C.pink, fg: C.ink, line: C.rose },
   navy: { bg: C.navy, fg: "#ffffff", line: C.navySoft },
-  mint: { bg: C.mint, fg: C.ink, line: "#6fcaa5" },
-  sun: { bg: C.sun, fg: C.ink, line: "#f0b94a" },
-  sky: { bg: C.sky, fg: C.ink, line: "#7aa7e8" },
+  mint: { bg: C.mint, fg: C.ink, line: "#34d399" }, // success-400
+  sun: { bg: C.sun, fg: C.ink, line: "#ffb900" }, // warning-400
+  sky: { bg: C.sky, fg: C.ink, line: "#60a5fa" }, // primary-400
 };
 
 /**
@@ -36,7 +39,7 @@ export const TONES: Record<Tone, { bg: string; fg: string; line: string }> = {
  */
 export const SAFE = { left: 90, top: 50, width: 1740, height: 460 };
 
-export const SHADOW = "0 18px 40px rgba(43, 58, 103, 0.14), 0 2px 6px rgba(43, 58, 103, 0.08)";
+export const SHADOW = "0 18px 40px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.08)";
 
 const RUBY = /([一-鿿々]+)\{([^}]+)\}/g;
 
@@ -143,7 +146,7 @@ export const SceneFrame: React.FC<{ duration: number; title?: string; children: 
 const Heading: React.FC<{ text: string }> = ({ text }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
     <div style={{ width: 12, height: 52, borderRadius: 6, background: `linear-gradient(${C.rose}, ${C.pink})` }} />
-    <Jp text={text} style={{ fontSize: 52, fontWeight: 800, color: C.navy }} />
+    <Jp text={text} style={{ fontFamily: SERIF, fontSize: 52, fontWeight: 700, color: C.navy }} />
   </div>
 );
 

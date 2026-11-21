@@ -3,7 +3,7 @@ import { AbsoluteFill, interpolate, interpolateColors, useCurrentFrame, useVideo
 import { FONT } from "./theme";
 import type { KaraokeCue, Unit } from "./types";
 
-const SUNG = "#ff8fb1";
+const SUNG = "#60a5fa"; // primary-400
 const TEXT = "#ffffff";
 /** Left of the chibi, which stands in the lower right. */
 const AREA = { left: 60, width: 1380, bottom: 40 };
@@ -57,7 +57,7 @@ export const Captions: React.FC<{ cues: KaraokeCue[] }> = ({ cues }) => {
               <UnitView key={i} u={u} t={t} />
             ))}
           </div>
-          {cue.translation ? <div style={{ marginTop: 10, fontSize: 38, fontWeight: 500, color: "#ffe58a" }}>{cue.translation}</div> : null}
+          {cue.translation ? <div style={{ marginTop: 10, fontSize: 38, fontWeight: 500, color: "#ffd230" }}>{cue.translation}</div> : null}
         </div>
       </div>
     </AbsoluteFill>
