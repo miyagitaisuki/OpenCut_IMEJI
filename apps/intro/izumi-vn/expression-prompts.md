@@ -34,8 +34,34 @@ Negative prompt: `legs, feet, shoes, text, watermark, extra fingers, distorted h
 | `O01_E06_G01.png` | shy, blushing cheeks, eyes looking to the side |
 | `O01_E07_G01.png` | surprised, eyes wide open, small round mouth |
 | `O01_E08_G01.png` | worried, slightly furrowed brows, uneasy eyes |
-| `O01_E09_G01.png` | thinking, eyes looking up, lips slightly pressed |
-| `O01_E10_G01.png` | winking, one eye closed, the other open, small smile |
+| `O01_E09_G01.png` | thinking, eyes looking up to the upper left, lips slightly pressed. **Thêm vào prompt: "navy blazer, no sailor collar, no white sailor-style collar"** |
+| `O01_E10_G01.png` | winking, one eye closed, the other open, small smile. **Thêm: "same scale and position as the reference, head centered at the same height as the reference"** |
+
+## Cử chỉ tay (G02–G11), dùng với E01 + O01
+
+Thay dòng `Hand gesture:` trong template. Các file đặt tên `O01_E01_G0x.png`.
+
+| File | Dòng `Hand gesture:` |
+|---|---|
+| `O01_E01_G02.png` | arms crossed in front of chest, forearms folded |
+| `O01_E01_G03.png` | one arm raised high, waving, open hand, the other arm relaxed |
+| `O01_E01_G04.png` | hugging a red book against chest with both arms |
+| `O01_E01_G05.png` | holding a red book with one hand at the side |
+| `O01_E01_G06.png` | one index finger pointing up |
+| `O01_E01_G07.png` | one arm extended pointing to the side (viewer's right) |
+| `O01_E01_G08.png` | one thumb up, other hand at side |
+| `O01_E01_G09.png` | one hand placed on chest |
+| `O01_E01_G10.png` | shrugging, both palms open, shoulders raised |
+| `O01_E01_G11.png` | both hands together clapping in front of chest |
+
+## Trang phục (O02–O03), dùng với E01 + G01
+
+Thay dòng `Outfit:` trong template. Giữ nguyên tóc và khuôn mặt.
+
+| File | Dòng `Outfit:` |
+|---|---|
+| `O02_E01_G01.png` | same blazer cut in grey, white collar, grey skirt hidden below the waist |
+| `O03_E01_G01.png` | white collared blouse, no blazer, navy skirt hidden below the waist |
 
 ## Kiểm tra từng ảnh (trước khi nhận)
 - [ ] Khuôn mặt, tóc, tỉ lệ đầu giống `7.png`.
