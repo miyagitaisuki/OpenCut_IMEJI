@@ -35,7 +35,7 @@ struct ProbeParams {
 struct MascotParams {
     /// Path of the project.json.
     project: PathBuf,
-    /// Avatar folder with avatar.json and a `poses` map (e.g. apps/intro/public/avatars/chibi). Needed the first time.
+    /// Avatar folder with avatar.json and a `poses` map (e.g. apps/intro/public/avatars/izumi). Needed the first time.
     avatar: Option<PathBuf>,
     /// bottom-right (default) or bottom-left.
     corner: Option<String>,

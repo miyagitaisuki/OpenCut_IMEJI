@@ -11,7 +11,7 @@ export type ThumbnailProps = {
   badge?: string;
   /** A small tag at the top: `Minna no Nihongo`. */
   tag?: string;
-  /** The chibi pose picture, relative to public/: `avatars/chibi/pose_c09.png`. */
+  /** The chibi pose picture, relative to public/: `avatars/izumi/pose_c09.png`. */
   pose?: string;
 };
 

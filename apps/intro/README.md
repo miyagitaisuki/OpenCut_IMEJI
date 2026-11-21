@@ -64,7 +64,7 @@ as one silent 1920x1080 video; OpenCut lays the voice, subtitles and the chibi o
 node scripts/lesson.ts preview scenes/ptc-vi.visuals.json ../../lessons/ptc-vi/ptc-vi.project.json
 # 3. Render the background and make it the project's picture:
 node scripts/lesson.ts build scenes/ptc-vi.visuals.json my.project.json
-opencut mascot my.project.json --avatar apps/intro/public/avatars/chibi
+opencut mascot my.project.json --avatar apps/intro/public/avatars/izumi
 opencut render my.project.json --burn-subtitles
 ```
 
@@ -131,7 +131,7 @@ Write the lesson first (the `soan-bai-video` skill does it with Claude Code): a 
 ```sh
 node apps/intro/scripts/lesson.ts check x.visuals.json x.script.vi.txt     # scenes fit the script?
 python scripts/opencut_ptc.py lesson --script x.script.vi.txt --out lessons/x \
-    --karaoke --mascot apps/intro/public/avatars/chibi --render             # voice, scenes, chibi, video
+    --karaoke --mascot apps/intro/public/avatars/izumi --render             # voice, scenes, chibi, video
 python scripts/lesson_audio.py mix lessons/x/x.mp4 -o lessons/x/x.final.mp4 \
     --markers lessons/x/x.markers.json                                       # music (ducked), chimes, -16 LUFS
 python scripts/lesson_qc.py video lessons/x/x.final.mp4                      # size, codec, loudness
@@ -169,7 +169,7 @@ A scene picks gestures over time:
 (`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
 is her smile once she has finished speaking.
 
-`demo` (original SVG art) and `izumi` (the owner's own character, a rigged PNG set) are in
+`demo` (original SVG art) and `izumi` (the owner's own character: 36 chibi poses, in `avatar.json`) are in
 the repository. Put an avatar made from someone else's art in `public/avatars/` and
 add it to `.gitignore` if it should stay out of git.
 
