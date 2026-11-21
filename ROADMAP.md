@@ -14,7 +14,7 @@ Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI),
 
 - **Lõi Rust**: `crates/media` (FFmpeg, OpenH264), `crates/project` (model, phụ đề, furigana, textts, mascot), `crates/render`.
 - **CLI `opencut`** (`apps/cli`): probe, frame, thumbnails, import-textts, mascot, check, render, render-batch, env, h264, mcp (12 tool MCP).
-- **Intro/cảnh** (`apps/intro`, Remotion): avatar sakura và chibi 36 tư thế, lồng tiếng AivisSpeech, cảnh lesson (title, grammar, compare, chart, dialogue, practice), bản Shorts dọc, thumbnail (`Thumbnail.tsx`).
+- **Intro/cảnh** (`apps/intro`, Remotion): avatar Izumi và chibi 36 tư thế, lồng tiếng AivisSpeech, cảnh lesson (title, grammar, compare, chart, dialogue, practice), bản Shorts dọc, thumbnail (`Thumbnail.tsx`).
 - **Pipeline Python** (`scripts/`, chỉ dùng standard library): `opencut_ptc.py`, `opencut_scenes.py` (Claude sinh cảnh), `lesson_audio.py`, `lesson_qc.py` (pron, engine, layout, video; circuit breaker, quarantine), `homographs.py` (5 từ tĩnh), `lesson_jobs.py` (hàng đợi HTTP, bộ nhớ/file), `publish_youtube.py` (có publish gate: cần QC PASSED).
 - **Nhánh hiện tại**: `feat/ducking-fugashi-encoder` (PR #32, đã merge). Cây làm việc sạch trước phiên Cổng 1.
 

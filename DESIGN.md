@@ -34,7 +34,7 @@ Quy tắc:
 **Đã bỏ chủ đề sakura:** không còn cánh hoa rơi, mọi màu hồng đã đổi sang IMEJI. Các sticker Lottie (`scripts/make_lottie.py`, sinh lại vào `public/lottie/`) và `scenes/images/office.svg` cũng đã đổi.
 
 **Ngoại lệ còn lại:**
-- Ảnh mascot (`public/avatars/sakura/*`, PNG có tóc hồng) là tài nguyên nhân vật, không đổi bằng code. Muốn đổi thì vẽ lại.
+- Mascot Izumi (`public/avatars/izumi/*`, bộ PNG đã rig, tóc nâu, áo khoác hồng nhạt) là tài nguyên nhân vật, không đổi bằng code. Muốn đổi thì vẽ lại.
 - Dấu ✓ đúng (`Short.tsx`, `#1f8a4c`) giữ nguyên.
 
 ## 2. Chữ

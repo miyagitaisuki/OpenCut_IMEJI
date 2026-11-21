@@ -13,7 +13,7 @@ beside her.
    ```json
    {
      "scene_type": "intro",
-     "avatar": "sakura",
+     "avatar": "izumi",
      "subtitle": "N4 文法",
      "title": "～てしまう",
      "text": "みなさん、こんにちは。N4文法の授業へようこそ。今日は「てしまう」を勉強しましょう。",
@@ -46,7 +46,7 @@ beside her.
 
    The lesson's audio, slides, subtitles and markers move after the intro;
    `--outro` adds a closing clip the same way. `scenes/outro.json` is a
-   ready outro (sakura points the lesson's learners to QBank): voice and
+   ready outro (Izumi points the lesson's learners to QBank): voice and
    render it exactly like an intro.
 
 No engine at hand? `bun run scripts/mock-engine.ts` serves a stand-in on
@@ -169,7 +169,7 @@ A scene picks gestures over time:
 (`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
 is her smile once she has finished speaking.
 
-`demo` (original SVG art) and `sakura` (the owner's own character, a rigged PNG set) are in
+`demo` (original SVG art) and `izumi` (the owner's own character, a rigged PNG set) are in
 the repository. Put an avatar made from someone else's art in `public/avatars/` and
 add it to `.gitignore` if it should stay out of git.
 
