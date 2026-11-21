@@ -31,19 +31,20 @@ Quy tắc:
 - Mọi cặp chữ/nền đạt WCAG AA ở khung 1920×1080.
 - Thêm màu mới phải đi qua `C`, không viết hex rải rác trong component.
 
-**Ngoại lệ có chủ ý:**
-- Cánh hoa anh đào (`Intro.tsx`, `#ffc0d4`) và ánh sáng avatar (`VrmAvatar.tsx`, `#ffd6e4`) giữ màu hồng để giữ chủ đề sakura. Đây là hình ảnh nhân vật, không phải màu giao diện.
+**Đã bỏ chủ đề sakura:** không còn cánh hoa rơi, mọi màu hồng đã đổi sang IMEJI. Các sticker Lottie (`scripts/make_lottie.py`, sinh lại vào `public/lottie/`) và `scenes/images/office.svg` cũng đã đổi.
+
+**Ngoại lệ còn lại:**
+- Ảnh mascot (`public/avatars/sakura/*`, PNG có tóc hồng) là tài nguyên nhân vật, không đổi bằng code. Muốn đổi thì vẽ lại.
 - Dấu ✓ đúng (`Short.tsx`, `#1f8a4c`) giữ nguyên.
-- Hình minh họa SVG (`scenes/images/*.svg`), animation Lottie (`scripts/make_lottie.py`) và prompt ảnh (`scenes/minna-05.pictures.md`) chưa đổi. Cần đổi khi làm lại tài nguyên.
 
 ## 2. Chữ
 
 | Vai trò | Font | Ghi chú |
 |---|---|---|
-| Phụ đề, nội dung, bảng | Noto Sans CJK JP (`FONT`) | Chữ Nhật và Việt; cần có trong môi trường render |
-| Tiêu đề scene, tiêu đề intro | **Noto Serif JP** (`SERIF`) | Serif theo yêu cầu; rơi về Playfair Display, rồi serif hệ thống |
+| Phụ đề, nội dung, bảng | **Be Vietnam Pro** (`FONT`, đóng gói qua `@fontsource/be-vietnam-pro`, các trọng số 400–800) | Chữ Latin và Việt. Chữ Nhật rơi về Noto Sans CJK JP |
+| Tiêu đề scene, tiêu đề intro | **Noto Serif JP** (`SERIF`) | Serif theo yêu cầu; môi trường render đã có. Rơi về Playfair Display, rồi serif hệ thống |
 
-- Be Vietnam Pro của IMEJI **chưa** áp dụng. Video render offline, cần cài font trước. **[cần quyết định]** có cài Be Vietnam Pro và Noto Serif JP vào môi trường render không.
+- Font được đóng gói trong `apps/intro`, nên render không cần tải từ mạng.
 - Tiêu đề scene: 700, cỡ 52 px. Tiêu đề intro: 700, cỡ 150 px.
 - Furigana giữ nguyên cách hiển thị (`Jp`).
 

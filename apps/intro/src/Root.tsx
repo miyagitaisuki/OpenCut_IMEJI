@@ -1,4 +1,8 @@
 import { Composition } from "remotion";
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/700.css";
+import "@fontsource/be-vietnam-pro/800.css";
 
 import { Intro, LEAD_IN, TAIL } from "./Intro";
 import type { IntroProps } from "./types";

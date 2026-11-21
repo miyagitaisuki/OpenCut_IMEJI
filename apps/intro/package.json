@@ -11,6 +11,7 @@
     "lesson": "node scripts/lesson.ts"
   },
   "dependencies": {
+    "@fontsource/be-vietnam-pro": "^5.3.0",
     "@pixiv/three-vrm": "^3",
     "@react-three/fiber": "^9",
     "@remotion/bundler": "4.0.540",

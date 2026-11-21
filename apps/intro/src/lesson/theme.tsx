@@ -22,7 +22,7 @@ export const C = {
 /** Tiêu đề dùng serif (IMEJI: Playfair Display; tiếng Nhật dùng Noto Serif JP). */
 export const SERIF = '"Noto Serif JP", "Noto Serif CJK JP", "Playfair Display", serif';
 
-export const FONT = '"Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif';
+export const FONT = '"Be Vietnam Pro", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif';
 
 export const TONES: Record<Tone, { bg: string; fg: string; line: string }> = {
   pink: { bg: C.pink, fg: C.ink, line: C.rose },

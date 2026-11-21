@@ -14,6 +14,7 @@ import type { IntroProps } from "./types";
 import type { Mouth } from "./visemes";
 import { Live2dAvatar } from "./Live2dAvatar";
 import { VrmAvatar, type VrmPoseState } from "./VrmAvatar";
+import { FONT } from "./lesson/theme";
 import { mouthAt, mouthStateAt } from "./visemes";
 
 /** Seconds before the avatar starts talking, and after it stops. */
@@ -32,7 +33,6 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
 
   return (
     <AbsoluteFill style={{ background: `linear-gradient(160deg, ${from} 0%, ${to} 100%)`, overflow: "hidden" }}>
-      <Petals frame={frame} width={width} height={height} />
       <div
         style={{
           position: "absolute",
@@ -85,7 +85,7 @@ export const Intro: React.FC<IntroProps> = ({ scene, avatar, voice, voiceSeconds
           width: 860,
           opacity: card,
           transform: `translateX(${(1 - card) * 120}px)`,
-          fontFamily: '"Noto Sans CJK JP", "Noto Sans JP", sans-serif',
+          fontFamily: FONT,
           color: "#fff",
           textShadow: "0 6px 24px rgba(0,0,0,.35)",
         }}
@@ -363,7 +363,7 @@ const Caption: React.FC<{ text: string; translation?: string; visible: boolean }
       display: "flex",
       justifyContent: "center",
       opacity: visible ? 1 : 0,
-      fontFamily: '"Noto Sans CJK JP", "Noto Sans JP", sans-serif',
+      fontFamily: FONT,
     }}
   >
     <div
@@ -380,36 +380,6 @@ const Caption: React.FC<{ text: string; translation?: string; visible: boolean }
     </div>
   </div>
 );
-
-/** Sakura petals drifting down, placed the same on every render. */
-const Petals: React.FC<{ frame: number; width: number; height: number }> = ({ frame, width, height }) => {
-  const petals = Array.from({ length: 24 }, (_, i) => {
-    const seed = (i * 9301 + 49297) % 233280;
-    const x = (seed / 233280) * width;
-    const speed = 1.2 + (i % 5) * 0.35;
-    const y = ((frame * speed + i * 97) % (height + 120)) - 60;
-    const drift = Math.sin((frame + i * 30) / 40) * 40;
-    const size = 18 + (i % 4) * 6;
-    const spin = interpolate(frame, [0, 300], [0, 360 * (i % 2 ? 1 : -1)], { extrapolateRight: "extend" });
-    return (
-      <div
-        key={i}
-        style={{
-          position: "absolute",
-          left: x + drift,
-          top: y,
-          width: size,
-          height: size * 0.7,
-          borderRadius: "80% 0 80% 0",
-          background: "#ffc0d4",
-          opacity: 0.75,
-          transform: `rotate(${spin}deg)`,
-        }}
-      />
-    );
-  });
-  return <>{petals}</>;
-};
 
 /** The VRM's pose inputs for one frame (all derived from the frame number). */
 function vrmState(

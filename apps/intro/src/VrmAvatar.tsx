@@ -207,7 +207,7 @@ export const VrmAvatar: React.FC<{
     <ThreeCanvas width={width} height={height} camera={camera} gl={{ alpha: true, antialias: true }}>
       <ambientLight intensity={1.4} />
       <directionalLight position={[1.2, 2.5, 2.5]} intensity={2.2} />
-      <directionalLight position={[-2, 1, 1]} intensity={0.8} color="#ffd6e4" />
+      <directionalLight position={[-2, 1, 1]} intensity={0.8} color="#bfdbfe" />
       {vrm && <primitive object={vrm.scene} />}
     </ThreeCanvas>
   );

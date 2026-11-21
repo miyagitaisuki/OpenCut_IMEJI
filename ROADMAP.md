@@ -8,7 +8,7 @@ OpenCut IMEJI là **xưởng sản xuất video bài giảng tiếng Nhật tự
 
 Luồng mục tiêu: QBank / kịch bản → textts (giọng + SRT + timeline) → cảnh minh họa → nhạc nền/SFX → render → QC → đăng YouTube (có cổng duyệt của người).
 
-Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) và `apps/web` (editor) đã bị xóa khỏi nhánh (còn trong lịch sử git, commit trước khi xóa: `d356565b`). `apps/api` (stub Cloudflare) được giữ lại.
+Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI), `apps/web` (editor) và `apps/api` (stub Cloudflare) đã bị xóa khỏi nhánh (còn trong lịch sử git, commit trước khi xóa: `d356565b`).
 
 ## 2. Hiện trạng (tóm tắt)
 

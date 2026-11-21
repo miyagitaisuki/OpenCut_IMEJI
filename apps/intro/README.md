@@ -3,7 +3,7 @@
 Remotion scenes in which a 2D avatar says the lesson's opening line, its
 mouth following the vowels AivisSpeech (or VOICEVOX) reports for each mora:
 あいうえお, closed for ん, っ, pauses and ま・ば・ぱ. She breathes, sways
-and blinks, sakura petals drift, and the lesson's title is on a card
+and blinks, and the lesson's title is on a card
 beside her.
 
 ## Make an intro
