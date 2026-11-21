@@ -1,11 +1,9 @@
 ⚠️ READ BEFORE SUBMITTING ⚠️
 
-We are not currently accepting PRs except for critical bugs.
+This is a headless video factory. Pull requests are accepted only in these cases:
 
-If this is a bug fix:
-- [ ] I've opened an issue first
-- [ ] This was approved by a maintainer
+- **Critical bug fix:** I've opened an issue first, and a maintainer approved it.
+- **Feature requested by an admin:** a repository admin asked for this feature in an issue or in writing. Link the request:
+  - Request link: 
 
-If this is a feature:
-
-This PR will be closed. Please open an issue to discuss first.
+Any other feature PR is closed. Open an issue to discuss it first.

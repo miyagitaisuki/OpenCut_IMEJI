@@ -8,13 +8,13 @@ OpenCut IMEJI là **xưởng sản xuất video bài giảng tiếng Nhật tự
 
 Luồng mục tiêu: QBank / kịch bản → textts (giọng + SRT + timeline) → cảnh minh họa → nhạc nền/SFX → render → QC → đăng YouTube (có cổng duyệt của người).
 
-Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI) và `apps/web` (editor) đã bị xóa khỏi nhánh (còn trong lịch sử git, commit trước khi xóa: `d356565b`). `apps/api` (stub Cloudflare) được giữ lại.
+Không làm: video editor GUI, plugin system, Editor API. `apps/desktop` (GPUI), `apps/web` (editor) và `apps/api` (stub Cloudflare) đã bị xóa khỏi nhánh (còn trong lịch sử git, commit trước khi xóa: `d356565b`).
 
 ## 2. Hiện trạng (tóm tắt)
 
 - **Lõi Rust**: `crates/media` (FFmpeg, OpenH264), `crates/project` (model, phụ đề, furigana, textts, mascot), `crates/render`.
 - **CLI `opencut`** (`apps/cli`): probe, frame, thumbnails, import-textts, mascot, check, render, render-batch, env, h264, mcp (12 tool MCP).
-- **Intro/cảnh** (`apps/intro`, Remotion): avatar sakura và chibi 36 tư thế, lồng tiếng AivisSpeech, cảnh lesson (title, grammar, compare, chart, dialogue, practice), bản Shorts dọc, thumbnail (`Thumbnail.tsx`).
+- **Intro/cảnh** (`apps/intro`, Remotion): avatar Izumi và chibi 36 tư thế, lồng tiếng AivisSpeech, cảnh lesson (title, grammar, compare, chart, dialogue, practice), bản Shorts dọc, thumbnail (`Thumbnail.tsx`).
 - **Pipeline Python** (`scripts/`, chỉ dùng standard library): `opencut_ptc.py`, `opencut_scenes.py` (Claude sinh cảnh), `lesson_audio.py`, `lesson_qc.py` (pron, engine, layout, video; circuit breaker, quarantine), `homographs.py` (5 từ tĩnh), `lesson_jobs.py` (hàng đợi HTTP, bộ nhớ/file), `publish_youtube.py` (có publish gate: cần QC PASSED).
 - **Nhánh hiện tại**: `feat/ducking-fugashi-encoder` (PR #32, đã merge). Cây làm việc sạch trước phiên Cổng 1.
 

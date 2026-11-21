@@ -2,7 +2,7 @@
 """Cut chibi pose sheets into one transparent PNG per pose, all on the same
 canvas with the feet in the same place, and write the avatar's `poses` map.
 
-  python scripts/slice_sheet.py public/avatars/chibi \
+  python scripts/slice_sheet.py public/avatars/izumi \
       --sheet a=sheetA.png --sheet b=sheetB.png --cols 4 --rows 3 \
       --names scripts/chibi_names.json
 

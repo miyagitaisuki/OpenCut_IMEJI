@@ -293,5 +293,56 @@ class TokenAndBind(unittest.TestCase):
             server.server_close()
 
 
+class DeleteFinished(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = lesson_jobs.Store(Path(self.tmp.name))
+        self.runner = types.SimpleNamespace(store=self.store)  # only Runner.delete's own logic is under test
+
+    def tearDown(self):
+        self.store.db.close()
+        self.tmp.cleanup()
+
+    def test_finished_job_is_removed_with_its_log_folder(self):
+        for status in ("done", "failed", "cancelled"):
+            job = new_job(f"j-{status}", status)
+            self.store.save(job)
+            (self.store.root / job["id"]).mkdir()
+            (self.store.root / job["id"] / "job.log").write_text("log", encoding="utf-8")
+            lesson_jobs.Runner.delete(self.runner, job["id"])
+            self.assertIsNone(self.store.get(job["id"]))
+            self.assertFalse((self.store.root / job["id"]).exists())
+        self.assertEqual(self.store.all(), [])
+
+    def test_active_job_is_refused(self):
+        for status in ("queued", "running", "quarantine"):
+            job = new_job(f"j-{status}", status)
+            self.store.save(job)
+            with self.assertRaises(lesson_jobs.JobError):
+                lesson_jobs.Runner.delete(self.runner, job["id"])
+            self.assertIsNotNone(self.store.get(job["id"]))
+
+    def test_missing_job_is_key_error(self):
+        with self.assertRaises(KeyError):
+            lesson_jobs.Runner.delete(self.runner, "nope")
+
+    def test_delete_over_http_needs_token(self):
+        import http.client
+        from http.server import ThreadingHTTPServer
+
+        handler = lesson_jobs.make_handler(None, None, token="secret")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+            conn.request("DELETE", "/jobs/x")
+            self.assertEqual(conn.getresponse().status, 401)
+            conn.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

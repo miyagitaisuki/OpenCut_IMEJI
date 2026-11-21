@@ -26,7 +26,7 @@ Examples:
       --out lessons/n2-nghe --render --burn-subtitles
   python scripts/opencut_ptc.py lesson --chapter 193 --limit 5 --out lessons/ch193
   python scripts/opencut_ptc.py lesson --script lessons/minna-05/minna-05.script.vi.txt \
-      --out lessons/minna-05 --karaoke --mascot apps/intro/public/avatars/chibi --render
+      --out lessons/minna-05 --karaoke --mascot apps/intro/public/avatars/izumi --render
 """
 from __future__ import annotations
 
@@ -795,7 +795,7 @@ def main(argv: list[str] | None = None) -> int:
     lesson.add_argument("--outro")
     lesson.add_argument("--slide", action="append")
     lesson.add_argument("--mascot", metavar="AVATAR_DIR",
-                        help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/chibi)")
+                        help="Chibi in the corner, changing pose per sentence (e.g. apps/intro/public/avatars/izumi)")
     lesson.add_argument("--visuals", metavar="VISUALS_JSON",
                         help="Scenes for the body (charts, diagrams...), timed by cue: apps/intro/scenes/*.visuals.json, "
                              "or `auto` to have Claude write them (needs ANTHROPIC_API_KEY)")

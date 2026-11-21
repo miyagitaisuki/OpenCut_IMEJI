@@ -3,7 +3,7 @@
 Remotion scenes in which a 2D avatar says the lesson's opening line, its
 mouth following the vowels AivisSpeech (or VOICEVOX) reports for each mora:
 あいうえお, closed for ん, っ, pauses and ま・ば・ぱ. She breathes, sways
-and blinks, sakura petals drift, and the lesson's title is on a card
+and blinks, and the lesson's title is on a card
 beside her.
 
 ## Make an intro
@@ -13,7 +13,7 @@ beside her.
    ```json
    {
      "scene_type": "intro",
-     "avatar": "sakura",
+     "avatar": "izumi",
      "subtitle": "N4 文法",
      "title": "～てしまう",
      "text": "みなさん、こんにちは。N4文法の授業へようこそ。今日は「てしまう」を勉強しましょう。",
@@ -24,7 +24,7 @@ beside her.
 
    `speaker` is an AivisSpeech style id (the same ids as textts' `roles.yaml`);
    left out, the engine's first voice speaks. `speed` (1 = normal) and
-   `colors` (`["#ffd6e4", "#2b3a67"]`, the background) are optional.
+   `colors` (`["#eff6ff", "#1e3a8a"]`, the background) are optional.
 
 2. With AivisSpeech running, voice it, then render it:
 
@@ -46,7 +46,7 @@ beside her.
 
    The lesson's audio, slides, subtitles and markers move after the intro;
    `--outro` adds a closing clip the same way. `scenes/outro.json` is a
-   ready outro (sakura points the lesson's learners to QBank): voice and
+   ready outro (Izumi points the lesson's learners to QBank): voice and
    render it exactly like an intro.
 
 No engine at hand? `bun run scripts/mock-engine.ts` serves a stand-in on
@@ -64,7 +64,7 @@ as one silent 1920x1080 video; OpenCut lays the voice, subtitles and the chibi o
 node scripts/lesson.ts preview scenes/ptc-vi.visuals.json ../../lessons/ptc-vi/ptc-vi.project.json
 # 3. Render the background and make it the project's picture:
 node scripts/lesson.ts build scenes/ptc-vi.visuals.json my.project.json
-opencut mascot my.project.json --avatar apps/intro/public/avatars/chibi
+opencut mascot my.project.json --avatar apps/intro/public/avatars/izumi
 opencut render my.project.json --burn-subtitles
 ```
 
@@ -131,7 +131,7 @@ Write the lesson first (the `soan-bai-video` skill does it with Claude Code): a 
 ```sh
 node apps/intro/scripts/lesson.ts check x.visuals.json x.script.vi.txt     # scenes fit the script?
 python scripts/opencut_ptc.py lesson --script x.script.vi.txt --out lessons/x \
-    --karaoke --mascot apps/intro/public/avatars/chibi --render             # voice, scenes, chibi, video
+    --karaoke --mascot apps/intro/public/avatars/izumi --render             # voice, scenes, chibi, video
 python scripts/lesson_audio.py mix lessons/x/x.mp4 -o lessons/x/x.final.mp4 \
     --markers lessons/x/x.markers.json                                       # music (ducked), chimes, -16 LUFS
 python scripts/lesson_qc.py video lessons/x/x.final.mp4                      # size, codec, loudness
@@ -169,7 +169,7 @@ A scene picks gestures over time:
 (`at` is seconds into the speech). `eyes_happy`, when the avatar has it,
 is her smile once she has finished speaking.
 
-`demo` (original SVG art) and `sakura` (the owner's own character, a rigged PNG set) are in
+`demo` (original SVG art) and `izumi` (the owner's own character: 36 chibi poses, in `avatar.json`) are in
 the repository. Put an avatar made from someone else's art in `public/avatars/` and
 add it to `.gitignore` if it should stay out of git.
 

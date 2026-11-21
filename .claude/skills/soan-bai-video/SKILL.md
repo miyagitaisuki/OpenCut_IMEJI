@@ -21,7 +21,7 @@ Hỏi số bài Minna (hoặc chủ đề), cấp độ (mặc định N5 với 
 3. **Ngữ pháp**: mỗi mẫu câu gồm câu giới thiệu + ví von (cảnh `grammar`), rồi **ít nhất 3 câu ví dụ, mỗi câu một dòng** (cảnh `examples`: mỗi thẻ có hình `images/<ten-hinh>.png` + câu Nhật + dịch Việt, thẻ hiện lên đúng lúc câu đó được đọc; mỗi hình một dòng trong `pictures.md`). Dùng `compare` khi so hai mẫu dễ nhầm.
 4. **Hội thoại mẫu** (6–10 câu, 2 vai): cảnh `dialogue` (bubbles).
 5. **Luyện tập** (3–5 câu hỏi): mỗi câu hỏi gồm 1 dòng đọc câu hỏi, 1 dòng `[pause=5000]`, 1 dòng đọc đáp án và lý do. Cảnh `practice` (`think` 5 s) đặt ở dòng đọc câu hỏi, `until_cue` đến hết dòng đáp án.
-6. **Tổng kết + rủ học bài sau cùng cô Sakura** (2–3 câu; không nhắc QBank). Cảnh `title` hoặc `grammar` tóm tắt, kèm `accent: "star"`.
+6. **Tổng kết + rủ học bài sau cùng cô Izumi** (2–3 câu; không nhắc QBank). Cảnh `title` hoặc `grammar` tóm tắt, kèm `accent: "star"`.
 
 ## 3. Quy tắc nội dung
 - Lời giảng **toàn tiếng Nhật**, đúng trình độ: N5 dùng thể です/ます, câu ngắn ≤ 40 ký tự, chỉ dùng từ đã học tới bài đó; giải thích ngữ pháp bằng câu đơn giản.
@@ -47,7 +47,7 @@ Rồi tự soát (hoặc giao một agent độc lập soát): ngữ pháp, các
 Báo đường dẫn hai file, số câu, thời lượng ước tính (≈ 5 s/câu + các pause), danh sách cảnh (cue → mẫu). Hỏi: **Duyệt và lồng tiếng (Đề xuất)** / Sửa. Chỉ khi người dùng duyệt mới dựng video. Chuẩn bị: textts REST chạy kèm ffmpeg trong PATH (không thì HTTP 500, MP3 rỗng), AivisSpeech bật, hình đã nằm trong `images/`. Dòng `## Tên chương` trong kịch bản là chương YouTube (cần ≥ 3).
 
 ```bash
-python scripts/opencut_ptc.py lesson --script lessons/<ten>/<ten>.script.vi.txt --out lessons/<ten>     --karaoke --mascot apps/intro/public/avatars/chibi --render
+python scripts/opencut_ptc.py lesson --script lessons/<ten>/<ten>.script.vi.txt --out lessons/<ten>     --karaoke --mascot apps/intro/public/avatars/izumi --render
 python scripts/lesson_audio.py mix lessons/<ten>/<ten>.mp4 -o lessons/<ten>/<ten>.final.mp4 --markers lessons/<ten>/<ten>.markers.json
 python scripts/lesson_qc.py video lessons/<ten>/<ten>.final.mp4
 node apps/intro/scripts/lesson.ts words lessons/<ten>/<ten>.project.json && python scripts/lesson_qc.py pron lessons/<ten>/<ten>.project.json --fix
