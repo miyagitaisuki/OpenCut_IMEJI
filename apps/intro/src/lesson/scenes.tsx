@@ -405,7 +405,8 @@ export const Vn: React.FC<P<VnScene>> = ({ scene, duration }) => {
       <Img
         key={sprite}
         src={staticFile(sprite)}
-        style={{ position: "absolute", left: 150, bottom: 300, width: 860, filter: "drop-shadow(0 18px 30px rgba(43, 58, 103, 0.18))" }}
+        // Sits under the text box, which hides the cut at the waist.
+        style={{ position: "absolute", right: 120, bottom: 200, width: 860, filter: "drop-shadow(0 18px 30px rgba(43, 58, 103, 0.18))" }}
       />
       <div
         key={idx}
@@ -429,7 +430,7 @@ export const Vn: React.FC<P<VnScene>> = ({ scene, duration }) => {
       </div>
       {choiceOn && scene.choice ? (
         <div
-          style={{ position: "absolute", right: 80, top: 130, width: 640, background: "#fff", borderRadius: 30, boxShadow: SHADOW, padding: 36 }}
+          style={{ position: "absolute", left: 80, top: 130, width: 640, background: "#fff", borderRadius: 30, boxShadow: SHADOW, padding: 36 }}
         >
           <Jp text={scene.choice.question} style={{ fontSize: 42, fontWeight: 700, color: C.navy }} />
           {scene.choice.options.map((o, i) => {
