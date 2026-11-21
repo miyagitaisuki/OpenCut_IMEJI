@@ -32,7 +32,7 @@ POST /jobs body, one source:
                                                     no "visuals" -> Claude writes the scenes
   {"script_path": "lessons/minna-05/minna-05.script.vi.txt"}   a script already on disk
 plus options: "name" (folder under lessons/, required with "script"), "title", "level" (N5..N1),
-"karaoke" (default true with a script), "mascot" (default apps/intro/public/avatars/chibi with a script),
+"karaoke" (default true with a script), "mascot" (default apps/intro/public/avatars/izumi with a script),
 "burn_subtitles", "bgm", "dry_run" (stop after writing the textts script),
 "publish": {"title", "description", "playlist", "privacy" (default unlisted), "tags"}.
 
@@ -81,7 +81,7 @@ REPO = Path(os.environ["OPENCUT_REPO"]).resolve() if os.environ.get("OPENCUT_REP
 SCRIPTS = REPO / "scripts"
 LESSONS = REPO / "lessons"
 JOBS_DIR = LESSONS / "_jobs"
-DEFAULT_MASCOT = "apps/intro/public/avatars/chibi"
+DEFAULT_MASCOT = "apps/intro/public/avatars/izumi"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 STAGES = ("tts", "scenes", "render", "mix", "qc", "publish")
 
@@ -604,7 +604,7 @@ class Runner:
         meta = out / f"{name}.thumb.json"
         png = out / f"{name}.thumb.png"
         meta.write_text(json.dumps({"title": spec["title"], "subtitle": "", "badge": spec.get("level") or "",
-                                    "tag": "", "pose": "avatars/chibi/pose_a01.png"}, ensure_ascii=False, indent=2) + "\n",
+                                    "tag": "", "pose": "avatars/izumi/pose_a01.png"}, ensure_ascii=False, indent=2) + "\n",
                         encoding="utf-8")
         node = os.environ.get("OPENCUT_NODE", "node")
         done = subprocess.run([node, "scripts/lesson.ts", "thumbnail", str(meta), "-o", str(png)],

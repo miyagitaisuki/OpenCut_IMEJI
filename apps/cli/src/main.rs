@@ -100,7 +100,7 @@ enum Command {
     /// sentence (poses picked from the subtitles). Run it after intro/outro are added.
     Mascot {
         project: PathBuf,
-        /// Avatar folder with `avatar.json` and a `poses` map (apps/intro/public/avatars/chibi).
+        /// Avatar folder with `avatar.json` and a `poses` map (apps/intro/public/avatars/izumi).
         #[arg(long)]
         avatar: Option<PathBuf>,
         /// bottom-right (default) or bottom-left.

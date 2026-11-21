@@ -47,7 +47,7 @@ opencut render lesson/bai10.project.json        # lesson/bai10.mp4 (+ .vtt .srt 
 - `project.json` is plain JSON (see `crates/project`): add Remotion intros/outros as
   `{"kind": "video", "path": "intro.mp4", "start": 0, "end": 5}` visuals, with the same file
   as an `audio` clip for its sound, and markers like `{"time": 42, "kind": "question", "ref": "qbank:123"}`.
-- **Mascot**: `opencut mascot lesson.project.json --avatar apps/intro/public/avatars/chibi` puts a
+- **Mascot**: `opencut mascot lesson.project.json --avatar apps/intro/public/avatars/izumi` puts a
   chibi in the bottom-right corner (`--corner bottom-left`, `--height 0.55`), changing pose with
   each subtitle sentence (greeting, question, praise, thanks… picked from what is said). Run it
   after intro/outro are added; burned-in subtitles keep clear of her. `--remove` takes her out. The

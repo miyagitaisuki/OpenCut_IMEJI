@@ -47,7 +47,7 @@ Rồi tự soát (hoặc giao một agent độc lập soát): ngữ pháp, các
 Báo đường dẫn hai file, số câu, thời lượng ước tính (≈ 5 s/câu + các pause), danh sách cảnh (cue → mẫu). Hỏi: **Duyệt và lồng tiếng (Đề xuất)** / Sửa. Chỉ khi người dùng duyệt mới dựng video. Chuẩn bị: textts REST chạy kèm ffmpeg trong PATH (không thì HTTP 500, MP3 rỗng), AivisSpeech bật, hình đã nằm trong `images/`. Dòng `## Tên chương` trong kịch bản là chương YouTube (cần ≥ 3).
 
 ```bash
-python scripts/opencut_ptc.py lesson --script lessons/<ten>/<ten>.script.vi.txt --out lessons/<ten>     --karaoke --mascot apps/intro/public/avatars/chibi --render
+python scripts/opencut_ptc.py lesson --script lessons/<ten>/<ten>.script.vi.txt --out lessons/<ten>     --karaoke --mascot apps/intro/public/avatars/izumi --render
 python scripts/lesson_audio.py mix lessons/<ten>/<ten>.mp4 -o lessons/<ten>/<ten>.final.mp4 --markers lessons/<ten>/<ten>.markers.json
 python scripts/lesson_qc.py video lessons/<ten>/<ten>.final.mp4
 node apps/intro/scripts/lesson.ts words lessons/<ten>/<ten>.project.json && python scripts/lesson_qc.py pron lessons/<ten>/<ten>.project.json --fix
